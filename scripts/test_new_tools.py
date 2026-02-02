@@ -2,6 +2,12 @@
 """
 Test ToolUniverse tools using their defined test_examples and return_schema.
 
+This script validates:
+- Tool execution success (no errors)
+- 404 error detection (tracks separately)
+- Schema validation against return_schema
+- Clear reporting of failures
+
 Usage:
     python scripts/test_new_tools.py [pattern] [--fail-fast] [--verbose]
 
@@ -9,6 +15,7 @@ Examples:
     python scripts/test_new_tools.py          # Test ALL tools
     python scripts/test_new_tools.py fda      # Test only tools matching "fda"
     python scripts/test_new_tools.py hpa -v   # Test "hpa" tools with verbose output
+    python scripts/test_new_tools.py cbioportal  # Test cBioPortal tools
 """
 import argparse
 import json
@@ -96,6 +103,15 @@ def format_result(val: Any, max_len: int = 100) -> str:
         return s[:max_len] + "..."
     return s
 
+def check_for_404_error(result: Any) -> bool:
+    """Check if result contains a 404 error."""
+    if isinstance(result, dict):
+        error = result.get("error", "")
+        if "404" in str(error):
+            return True
+    return False
+
+
 def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) -> Dict[str, Any]:
     stats = {
         "files": 0,
@@ -105,7 +121,9 @@ def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) ->
         "failed": 0,
         "skipped": 0,
         "schema_valid": 0,
-        "schema_invalid": 0
+        "schema_invalid": 0,
+        "errors_404": 0,
+        "errors_other": 0
     }
     
     start_time = time.time()
@@ -153,7 +171,19 @@ def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) ->
                     # Note: ToolUniverse.run_one_function expects specific dict format
                     result = tu.run_one_function({"name": name, "arguments": inputs})
 
+                    # Check for 404 errors first
+                    if check_for_404_error(result):
+                        stats["failed"] += 1
+                        stats["errors_404"] += 1
+                        error = result.get("error", "Unknown 404 error")
+                        print(f"    ❌ {name} Ex {idx+1}: 404 ERROR - {error}")
+                        if args.fail_fast:
+                            print("Stopping due to --fail-fast")
+                            return stats
+                        continue
+
                     # ToolUniverse generic wrapper often returns dict with success/data/error
+                    # or status/data/error (new style)
                     # But some specific tools might return raw data.
                     # Let's standardize interpretation.
 
@@ -161,17 +191,25 @@ def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) ->
                     data = None
                     error = None
 
-                    if isinstance(result, dict) and "success" in result:
-                        success = result["success"]
-                        if success:
+                    if isinstance(result, dict):
+                        # Check for status field (new API style)
+                        if "status" in result:
+                            success = result["status"] == "success"
                             data = result.get("data")
-                            # If data is missing but success is True, use the whole result minus metadata?
-                            # Usually 'data' field holds the return value.
-                        else:
                             error = result.get("error")
+                        # Check for success field (old style)
+                        elif "success" in result:
+                            success = result["success"]
+                            if success:
+                                data = result.get("data")
+                            else:
+                                error = result.get("error")
+                        else:
+                            # No status/success field, assume raw data
+                            success = True
+                            data = result
                     else:
-                        # Assume raw return means success if not None (or even if None?)
-                        # Some tools might return None as valid result.
+                        # Assume raw return means success
                         success = True
                         data = result
 
@@ -191,6 +229,7 @@ def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) ->
 
                     else:
                         stats["failed"] += 1
+                        stats["errors_other"] += 1
                         print(f"    ❌ {name} Ex {idx+1}: Failed - {error}")
                         if args.fail_fast:
                             print("Stopping due to --fail-fast")
@@ -198,6 +237,7 @@ def run_tests(tu: ToolUniverse, configs: List[Tuple[Path, List[Dict]]], args) ->
 
                 except Exception as e:
                     stats["failed"] += 1
+                    stats["errors_other"] += 1
                     print(f"    🔥 {name} Ex {idx+1}: Exception - {e}")
                     if args.fail_fast:
                         return stats
@@ -269,6 +309,10 @@ def main():
     else:
         print("Passed: 0")
     print(f"Failed:           {stats['failed']}")
+    if stats["errors_404"] > 0:
+        print(f"  └─ 404 Errors:  {stats['errors_404']}")
+    if stats["errors_other"] > 0:
+        print(f"  └─ Other Errors: {stats['errors_other']}")
     print(f"Skipped:          {stats['skipped']}")
     print("-" * 30)
     print(f"Schema Valid:     {stats['schema_valid']}")
