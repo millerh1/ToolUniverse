@@ -11,6 +11,7 @@ from ._shared_client import get_shared_client
 def FourDN_get_experiment_metadata(
     operation: str,
     experiment_accession: str,
+    include_full_metadata: Optional[bool] = False,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
@@ -24,7 +25,9 @@ def FourDN_get_experiment_metadata(
     operation : str
 
     experiment_accession : str
-        4DN experiment accession (e.g., '4DNEXO67APU1')
+        4DN experiment accession (e.g., '4DNEXHVF8WA9'). Obtain by searching with Fou...
+    include_full_metadata : bool
+        Include complete API response in 'metadata' field (default: false). Set to tr...
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -44,6 +47,7 @@ def FourDN_get_experiment_metadata(
             "arguments": {
                 "operation": operation,
                 "experiment_accession": experiment_accession,
+                "include_full_metadata": include_full_metadata,
             },
         },
         stream_callback=stream_callback,

@@ -1,7 +1,7 @@
 """
 ena_get_sequence_embl
 
-Get nucleotide sequence in EMBL format from ENA by accession number. Returns EMBL-formatted seque...
+Get nucleotide sequence in EMBL format from ENA by accession number. Supports EMBL/GenBank access...
 """
 
 from typing import Any, Optional, Callable
@@ -16,12 +16,12 @@ def ena_get_sequence_embl(
     validate: bool = True,
 ) -> dict[str, Any]:
     """
-    Get nucleotide sequence in EMBL format from ENA by accession number. Returns EMBL-formatted seque...
+    Get nucleotide sequence in EMBL format from ENA by accession number. Supports EMBL/GenBank access...
 
     Parameters
     ----------
     accession : str
-        ENA accession number
+        EMBL/GenBank accession number. NOT RefSeq (NC_*, NM_*, NP_*). Examples: 'U000...
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False

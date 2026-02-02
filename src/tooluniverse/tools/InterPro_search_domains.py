@@ -10,7 +10,7 @@ from ._shared_client import get_shared_client
 
 def InterPro_search_domains(
     query: str,
-    size: Optional[int] = 20,
+    page_size: Optional[int] = 20,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
@@ -23,8 +23,8 @@ def InterPro_search_domains(
     ----------
     query : str
         Domain name, accession, or search term (e.g., 'kinase', 'IPR000719')
-    size : int
-        Number of results to return (default: 20, max: 100)
+    page_size : int
+        Number of results to return per page (default: 20, max: 100)
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -41,7 +41,7 @@ def InterPro_search_domains(
     return get_shared_client().run_one_function(
         {
             "name": "InterPro_search_domains",
-            "arguments": {"query": query, "size": size},
+            "arguments": {"query": query, "page_size": page_size},
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

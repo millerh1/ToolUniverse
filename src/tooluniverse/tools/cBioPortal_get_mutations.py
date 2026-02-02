@@ -1,7 +1,7 @@
 """
 cBioPortal_get_mutations
 
-Get mutation data for specific genes in a cancer study
+Get mutation data for specific genes in a cancer study. This uses the updated cBioPortal API that...
 """
 
 from typing import Any, Optional, Callable
@@ -18,7 +18,7 @@ def cBioPortal_get_mutations(
     validate: bool = True,
 ) -> list[Any]:
     """
-    Get mutation data for specific genes in a cancer study
+    Get mutation data for specific genes in a cancer study. This uses the updated cBioPortal API that...
 
     Parameters
     ----------
@@ -26,8 +26,8 @@ def cBioPortal_get_mutations(
         Cancer study ID (e.g., 'brca_tcga')
     gene_list : str
         Comma-separated gene symbols (e.g., 'BRCA1,BRCA2')
-    sample_list_id : str, optional
-        Sample list ID. If not provided, uses all samples in the study
+    sample_list_id : str
+        Optional sample list ID. If not provided, uses all samples in the study.
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -40,12 +40,16 @@ def cBioPortal_get_mutations(
     list[Any]
     """
     # Handle mutable defaults to avoid B006 linting error
-    arguments = {"study_id": study_id, "gene_list": gene_list}
-    if sample_list_id:
-        arguments["sample_list_id"] = sample_list_id
 
     return get_shared_client().run_one_function(
-        {"name": "cBioPortal_get_mutations", "arguments": arguments},
+        {
+            "name": "cBioPortal_get_mutations",
+            "arguments": {
+                "study_id": study_id,
+                "gene_list": gene_list,
+                "sample_list_id": sample_list_id,
+            },
+        },
         stream_callback=stream_callback,
         use_cache=use_cache,
         validate=validate,

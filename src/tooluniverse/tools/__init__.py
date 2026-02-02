@@ -1,7 +1,7 @@
 """
 ToolUniverse Tools
 
-Type-safe Python interface to 1068 scientific tools.
+Type-safe Python interface to 1079 scientific tools.
 Each tool is in its own module for minimal import overhead.
 
 Usage:
@@ -653,6 +653,9 @@ from .MyGene_get_gene_annotation import MyGene_get_gene_annotation
 from .MyGene_query_genes import MyGene_query_genes
 from .MyVariant_get_variant_annotation import MyVariant_get_variant_annotation
 from .MyVariant_query_variants import MyVariant_query_variants
+from .NCBI_fetch_accessions import NCBI_fetch_accessions
+from .NCBI_get_sequence import NCBI_get_sequence
+from .NCBI_search_nucleotide import NCBI_search_nucleotide
 from .NICE_Clinical_Guidelines_Search import NICE_Clinical_Guidelines_Search
 from .NICE_Guideline_Full_Text import NICE_Guideline_Full_Text
 from .NoveltySignificanceReviewer import NoveltySignificanceReviewer
@@ -895,7 +898,6 @@ from .Reactome_list_top_pathways import Reactome_list_top_pathways
 from .Reactome_map_uniprot_to_pathways import Reactome_map_uniprot_to_pathways
 from .Reactome_map_uniprot_to_reactions import Reactome_map_uniprot_to_reactions
 from .Reactome_query_by_ids import Reactome_query_by_ids
-from .Reactome_query_enhanced import Reactome_query_enhanced
 from .ReferenceInfoAnalyzer import ReferenceInfoAnalyzer
 from .RegulomeDB_query_variant import RegulomeDB_query_variant
 from .ReproducibilityTransparencyReviewer import ReproducibilityTransparencyReviewer
@@ -993,8 +995,16 @@ from .arrayexpress_get_experiment_files import arrayexpress_get_experiment_files
 from .arrayexpress_get_experiment_samples import arrayexpress_get_experiment_samples
 from .arrayexpress_search_experiments import arrayexpress_search_experiments
 from .biomodels_search import biomodels_search
+from .biostudies_get_study import biostudies_get_study
+from .biostudies_get_study_files import biostudies_get_study_files
+from .biostudies_search import biostudies_search
+from .biostudies_search_by_collection import biostudies_search_by_collection
 from .cBioPortal_get_cancer_studies import cBioPortal_get_cancer_studies
+from .cBioPortal_get_genes import cBioPortal_get_genes
+from .cBioPortal_get_molecular_profiles import cBioPortal_get_molecular_profiles
 from .cBioPortal_get_mutations import cBioPortal_get_mutations
+from .cBioPortal_get_patients import cBioPortal_get_patients
+from .cBioPortal_get_samples import cBioPortal_get_samples
 from .call_agentic_human import call_agentic_human
 from .cancer_biomarkers_disease_target_score import (
     cancer_biomarkers_disease_target_score,
@@ -1100,6 +1110,7 @@ from .embedding_sync_download import embedding_sync_download
 from .embedding_sync_upload import embedding_sync_upload
 from .ena_get_entry import ena_get_entry
 from .ena_get_entry_history import ena_get_entry_history
+from .ena_get_entry_summary import ena_get_entry_summary
 from .ena_get_sequence_embl import ena_get_sequence_embl
 from .ena_get_sequence_fasta import ena_get_sequence_fasta
 from .ena_get_sequence_xml import ena_get_sequence_xml
@@ -1933,6 +1944,9 @@ __all__ = [
     "MyGene_query_genes",
     "MyVariant_get_variant_annotation",
     "MyVariant_query_variants",
+    "NCBI_fetch_accessions",
+    "NCBI_get_sequence",
+    "NCBI_search_nucleotide",
     "NICE_Clinical_Guidelines_Search",
     "NICE_Guideline_Full_Text",
     "NoveltySignificanceReviewer",
@@ -2057,7 +2071,6 @@ __all__ = [
     "Reactome_map_uniprot_to_pathways",
     "Reactome_map_uniprot_to_reactions",
     "Reactome_query_by_ids",
-    "Reactome_query_enhanced",
     "ReferenceInfoAnalyzer",
     "RegulomeDB_query_variant",
     "ReproducibilityTransparencyReviewer",
@@ -2143,8 +2156,16 @@ __all__ = [
     "arrayexpress_get_experiment_samples",
     "arrayexpress_search_experiments",
     "biomodels_search",
+    "biostudies_get_study",
+    "biostudies_get_study_files",
+    "biostudies_search",
+    "biostudies_search_by_collection",
     "cBioPortal_get_cancer_studies",
+    "cBioPortal_get_genes",
+    "cBioPortal_get_molecular_profiles",
     "cBioPortal_get_mutations",
+    "cBioPortal_get_patients",
+    "cBioPortal_get_samples",
     "call_agentic_human",
     "cancer_biomarkers_disease_target_score",
     "cancer_gene_census_disease_target_score",
@@ -2218,6 +2239,7 @@ __all__ = [
     "embedding_sync_upload",
     "ena_get_entry",
     "ena_get_entry_history",
+    "ena_get_entry_summary",
     "ena_get_sequence_embl",
     "ena_get_sequence_fasta",
     "ena_get_sequence_xml",

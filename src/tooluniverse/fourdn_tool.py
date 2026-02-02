@@ -17,7 +17,8 @@ FOURDN_BASE_URL = "https://data.4dnucleome.org"
 @register_tool("FourDNTool")
 class FourDNTool(BaseTool):
     """
-    4DN Data Portal API tool for accessing Hi-C and chromatin conformation data.
+    4DN Data Portal API tool for accessing Hi-C and
+    chromatin conformation data.
     """
 
     def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,29 +80,47 @@ class FourDNTool(BaseTool):
         """Get metadata for a specific file."""
         try:
             file_accession = arguments.get("file_accession")
+            include_full_metadata = arguments.get("include_full_metadata", False)
 
             if not file_accession:
                 return {"status": "error", "error": "file_accession is required"}
 
-            url = f"{FOURDN_BASE_URL}/{file_accession}/?format=json"
+            # Use frame=object for smaller response (84% reduction)
+            url = f"{FOURDN_BASE_URL}/{file_accession}/?format=json&frame=object"
             response = requests.get(url, timeout=30)
             response.raise_for_status()
 
             data = response.json()
 
-            return {
+            # Handle file_format - can be dict or string with frame=object
+            file_format = data.get("file_format")
+            if isinstance(file_format, dict):
+                file_format = file_format.get("display_title")
+            elif isinstance(file_format, str):
+                # Extract format from URL like /file-formats/bw/
+                file_format = (
+                    file_format.split("/")[-2] if "/" in file_format else file_format
+                )
+
+            result = {
                 "status": "success",
                 "accession": file_accession,
                 "file_type": data.get("file_type"),
-                "file_format": data.get("file_format", {}).get("display_title"),
+                "file_format": file_format,
                 "file_size": data.get("file_size"),
                 "description": data.get("description"),
                 "data_status": data.get("status"),
                 "biosource": data.get("biosource"),
                 "experiment": data.get("experiment"),
-                "download_url": f"{FOURDN_BASE_URL}/{file_accession}/@@download",
-                "metadata": data,
+                "download_url": (f"{FOURDN_BASE_URL}/{file_accession}/@@download"),
             }
+
+            # Only include full metadata if explicitly requested
+            # This reduces response size by ~97% in typical cases
+            if include_full_metadata:
+                result["metadata"] = data
+
+            return result
 
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -110,32 +129,72 @@ class FourDNTool(BaseTool):
         """Get metadata for a specific experiment."""
         try:
             experiment_accession = arguments.get("experiment_accession")
+            include_full_metadata = arguments.get("include_full_metadata", False)
 
             if not experiment_accession:
                 return {"status": "error", "error": "experiment_accession is required"}
 
-            url = f"{FOURDN_BASE_URL}/{experiment_accession}/?format=json"
+            # Use frame=object for smaller response
+            url = f"{FOURDN_BASE_URL}/{experiment_accession}/?format=json&frame=object"
             response = requests.get(url, timeout=30)
             response.raise_for_status()
 
             data = response.json()
 
-            return {
+            # Extract biosource from biosample
+            # (biosource is nested inside biosample)
+            biosample = data.get("biosample", {})
+            # Handle biosample - can be dict or string with frame=object
+            if isinstance(biosample, str):
+                biosample = {"@id": biosample}
+                biosource_list = []
+                biosource_summary = ""
+            else:
+                biosource_list = biosample.get("biosource", [])
+                biosource_summary = biosample.get("biosource_summary", "")
+
+            # Combine files from different possible fields
+            files = data.get("files", [])
+            if not files:
+                files = data.get("processed_files", [])
+
+            # Handle experiment_type - can be dict or string
+            exp_type = data.get("experiment_type")
+            if isinstance(exp_type, dict):
+                exp_type_name = exp_type.get("display_title")
+            elif isinstance(exp_type, str):
+                # Extract from URL like /experiment-types/in-situ-hi-c/
+                exp_type_name = (
+                    exp_type.split("/")[-2].replace("-", " ")
+                    if "/" in exp_type
+                    else exp_type
+                )
+            else:
+                exp_type_name = None
+
+            result = {
                 "status": "success",
                 "accession": experiment_accession,
-                "experiment_type": data.get("experiment_type", {}).get("display_title"),
-                "biosource": data.get("biosource"),
+                "experiment_type": exp_type_name,
+                "biosample": biosample,
+                "biosource": biosource_list,
+                "biosource_summary": biosource_summary,
                 "description": data.get("description"),
                 "data_status": data.get("status"),
-                "files": data.get("files", []),
-                "metadata": data,
+                "files": files,
             }
+
+            # Only include full metadata if explicitly requested
+            if include_full_metadata:
+                result["metadata"] = data
+
+            return result
 
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
     def _download_file_url(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Get download URL for a file (requires authentication for download)."""
+        """Get download URL for file (requires authentication)."""
         try:
             file_accession = arguments.get("file_accession")
 
@@ -148,10 +207,14 @@ class FourDNTool(BaseTool):
             return {
                 "status": "success",
                 "accession": file_accession,
-                "download_url": f"{FOURDN_BASE_URL}/{file_accession}/@@download",
+                "download_url": (f"{FOURDN_BASE_URL}/{file_accession}/@@download"),
                 "drs_url": drs_url,
-                "note": "File download requires authentication. Use curl with access key: curl -O -L --user <key>:<secret> <download-url>",
-                "instruction": "Create access key at https://data.4dnucleome.org/me",
+                "note": (
+                    "File download requires authentication. "
+                    "Use curl with access key: "
+                    "curl -O -L --user <key>:<secret> <download-url>"
+                ),
+                "instruction": ("Create access key at https://data.4dnucleome.org/me"),
             }
 
         except Exception as e:

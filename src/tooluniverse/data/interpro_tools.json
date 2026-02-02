@@ -22,15 +22,36 @@
     },
     "return_schema": {
       "type": "object",
+      "description": "InterPro API response for protein domains",
       "properties": {
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "Status of the request (success or error)"
         },
-        "error": {
-          "type": "string"
+        "data": {
+          "type": "array",
+          "description": "List of InterPro entries matching the protein",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "description": "Entry metadata including accession, name, type, description"
+              }
+            }
+          }
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of entries found"
         },
         "url": {
-          "type": "string"
+          "type": "string",
+          "description": "The API URL that was called"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if request failed"
         }
       }
     },
@@ -51,9 +72,9 @@
           "type": "string",
           "description": "Domain name, accession, or search term (e.g., 'kinase', 'IPR000719')"
         },
-        "size": {
+        "page_size": {
           "type": "integer",
-          "description": "Number of results to return (default: 20, max: 100)",
+          "description": "Number of results to return per page (default: 20, max: 100)",
           "default": 20,
           "minimum": 1,
           "maximum": 100
@@ -64,28 +85,49 @@
       ]
     },
     "fields": {
-      "endpoint": "https://www.ebi.ac.uk/interpro/api/entry/interpro/search?query={query}&size={size}",
+      "endpoint": "https://www.ebi.ac.uk/interpro/api/entry/interpro?search={query}&page_size={page_size}",
       "extract_path": "results",
       "return_format": "JSON"
     },
     "return_schema": {
       "type": "object",
+      "description": "InterPro API search response",
       "properties": {
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "Status of the request (success or error)"
         },
-        "error": {
-          "type": "string"
+        "data": {
+          "type": "array",
+          "description": "List of matching InterPro entries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "description": "Entry metadata including accession, name, type, description"
+              }
+            }
+          }
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of entries returned (not total count)"
         },
         "url": {
-          "type": "string"
+          "type": "string",
+          "description": "The API URL that was called"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if request failed"
         }
       }
     },
     "test_examples": [
       {
-        "query": "machine learning optimization",
-        "size": 20
+        "query": "kinase",
+        "page_size": 20
       }
     ]
   },
@@ -98,7 +140,7 @@
       "properties": {
         "accession": {
           "type": "string",
-          "description": "InterPro accession ID (e.g., IPR000719, IPR000719)"
+          "description": "InterPro accession ID (e.g., IPR000719)"
         }
       },
       "required": [
@@ -111,42 +153,75 @@
     },
     "return_schema": {
       "type": "object",
-      "description": "Detailed InterPro entry information",
+      "description": "InterPro API response for domain details",
       "properties": {
-        "metadata": {
+        "status": {
+          "type": "string",
+          "description": "Status of the request (success or error)"
+        },
+        "data": {
           "type": "object",
+          "description": "Detailed InterPro entry information",
           "properties": {
-            "accession": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string"
-            },
-            "source_database": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
+            "metadata": {
+              "type": "object",
+              "description": "Entry metadata",
+              "properties": {
+                "accession": {
+                  "type": "string",
+                  "description": "InterPro accession ID"
+                },
+                "entry_id": {
+                  "type": "string",
+                  "description": "Entry identifier"
+                },
+                "name": {
+                  "type": "object",
+                  "description": "Entry name with short and full forms"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Entry type (Family, Domain, Repeat, etc.)"
+                },
+                "source_database": {
+                  "type": "string",
+                  "description": "Source database (interpro)"
+                },
+                "description": {
+                  "type": "array",
+                  "description": "Detailed description text"
+                },
+                "go_terms": {
+                  "type": "array",
+                  "description": "Associated Gene Ontology terms"
+                },
+                "hierarchy": {
+                  "type": "object",
+                  "description": "Domain hierarchy information"
+                },
+                "member_databases": {
+                  "type": "object",
+                  "description": "Member database signatures"
+                }
+              }
             }
           }
         },
-        "hierarchy": {
-          "type": "object",
-          "description": "Domain hierarchy information"
+        "count": {
+          "type": "integer",
+          "description": "Number of results (always 1 for this endpoint)"
         },
-        "member_databases": {
-          "type": "object",
-          "description": "Member database signatures"
+        "url": {
+          "type": "string",
+          "description": "The API URL that was called"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if request failed"
         }
       }
     },
     "test_examples": [
-      {
-        "accession": "IPR000719"
-      },
       {
         "accession": "IPR000719"
       }

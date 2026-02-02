@@ -74,7 +74,7 @@
     {
         "name": "clinical_trials_get_details",
         "type": "ClinicalTrialsGovTool",
-        "description": "Retrieves comprehensive details about a specific clinical trial using its NCT ID.",
+        "description": "Retrieves comprehensive details about a specific clinical trial using its NCT ID. To find NCT IDs, first use the clinical_trials_search tool to search for trials by condition or intervention.",
         "parameter": {
             "type": "object",
             "properties": {
@@ -121,7 +121,7 @@
         "test_examples": [
             {
                 "action": "get_study_details",
-                "nct_id": "NCT04008226"
+                "nct_id": "NCT06563804"
             }
         ]
     }

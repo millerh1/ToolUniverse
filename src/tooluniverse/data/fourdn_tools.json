@@ -68,7 +68,7 @@
   {
     "name": "FourDN_get_file_metadata",
     "type": "FourDNTool",
-    "description": "Get detailed metadata for specific 4DN files including Hi-C contact matrices, TAD (Topologically Associating Domain) calls, A/B compartment annotations, and chromatin loop lists. Returns file type, format, size (check before downloading - files can be GBs), description, associated experiment, and biosource information. Use for: checking file details before download, understanding processing pipeline, accessing quality metrics.",
+    "description": "Get detailed metadata for specific 4DN files including Hi-C contact matrices, TAD (Topologically Associating Domain) calls, A/B compartment annotations, and chromatin loop lists. Returns file type, format, size (check before downloading - files can be GBs), description, associated experiment, and biosource information. Prerequisites: Requires file accession - obtain by using FourDN_search_data with item_type='File'. Use for: checking file details before download, understanding processing pipeline, accessing quality metrics.",
     "parameter": {
       "type": "object",
       "properties": {
@@ -79,7 +79,12 @@
         },
         "file_accession": {
           "type": "string",
-          "description": "4DN file accession (e.g., '4DNFIIA7E3HL')"
+          "description": "4DN file accession (e.g., '4DNFIIA7E3HL'). Obtain by searching with FourDN_search_data (item_type='File')."
+        },
+        "include_full_metadata": {
+          "type": "boolean",
+          "description": "Include complete API response in 'metadata' field (default: false). Set to true only if you need all raw fields. Omitting this reduces response size by ~97%.",
+          "default": false
         }
       },
       "required": ["operation", "file_accession"]
@@ -109,7 +114,7 @@
   {
     "name": "FourDN_get_experiment_metadata",
     "type": "FourDNTool",
-    "description": "Get metadata for 4DN experiments including experimental design, biosource information, protocol details, and associated files. Returns experiment type (Hi-C variants, ATAC-seq, ChIP-seq), cell type, processing status, and list of output files. Use for: understanding experimental context, finding all files from experiment, checking data provenance.",
+    "description": "Get metadata for 4DN experiments including experimental design, biosource information, protocol details, and associated files. Returns experiment type (Hi-C variants, ATAC-seq, ChIP-seq), cell type, processing status, and list of output files. Prerequisites: Requires experiment accession - obtain by using FourDN_search_data with item_type='Experiment'. Use for: understanding experimental context, finding all files from experiment, checking data provenance.",
     "parameter": {
       "type": "object",
       "properties": {
@@ -120,7 +125,12 @@
         },
         "experiment_accession": {
           "type": "string",
-          "description": "4DN experiment accession (e.g., '4DNEXO67APU1')"
+          "description": "4DN experiment accession (e.g., '4DNEXHVF8WA9'). Obtain by searching with FourDN_search_data (item_type='Experiment')."
+        },
+        "include_full_metadata": {
+          "type": "boolean",
+          "description": "Include complete API response in 'metadata' field (default: false). Set to true only if you need all raw fields. Omitting this reduces response size significantly.",
+          "default": false
         }
       },
       "required": ["operation", "experiment_accession"]
@@ -131,8 +141,11 @@
         "status": {"type": "string"},
         "accession": {"type": "string"},
         "experiment_type": {"type": "string"},
-        "biosource": {"type": "object"},
+        "biosample": {"type": "object"},
+        "biosource": {"type": "array"},
+        "biosource_summary": {"type": "string"},
         "description": {"type": "string"},
+        "data_status": {"type": "string"},
         "files": {"type": "array"},
         "metadata": {"type": "object"},
         "error": {"type": "string"}
@@ -142,14 +155,14 @@
     "test_examples": [
       {
         "operation": "get_experiment_metadata",
-        "experiment_accession": "4DNEXO67APU1"
+        "experiment_accession": "4DNEXHVF8WA9"
       }
     ]
   },
   {
     "name": "FourDN_get_download_url",
     "type": "FourDNTool",
-    "description": "Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: Requires free 4DN account - create at data.4dnucleome.org, then generate access key in your profile settings. Returns download URL and instructions for command-line access with curl. Supports GA4GH DRS standard for interoperability. Use for: programmatic file download, batch processing, workflow integration.",
+    "description": "Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: (1) Requires file accession - obtain by using FourDN_search_data with item_type='File'. (2) Requires free 4DN account - create at data.4dnucleome.org, then generate access key in your profile settings. Returns download URL and instructions for command-line access with curl. Supports GA4GH DRS standard for interoperability. Use for: programmatic file download, batch processing, workflow integration.",
     "parameter": {
       "type": "object",
       "properties": {
@@ -160,7 +173,7 @@
         },
         "file_accession": {
           "type": "string",
-          "description": "4DN file accession"
+          "description": "4DN file accession (e.g., '4DNFIIA7E3HL'). Obtain by searching with FourDN_search_data (item_type='File')."
         }
       },
       "required": ["operation", "file_accession"]

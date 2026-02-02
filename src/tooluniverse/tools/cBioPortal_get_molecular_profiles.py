@@ -1,7 +1,7 @@
 """
 cBioPortal_get_molecular_profiles
 
-Get molecular profiles for a cancer study
+Get molecular profiles for a cancer study. Molecular profiles include mutation data, copy number ...
 """
 
 from typing import Any, Optional, Callable
@@ -16,7 +16,7 @@ def cBioPortal_get_molecular_profiles(
     validate: bool = True,
 ) -> list[Any]:
     """
-    Get molecular profiles for a cancer study
+    Get molecular profiles for a cancer study. Molecular profiles include mutation data, copy number ...
 
     Parameters
     ----------

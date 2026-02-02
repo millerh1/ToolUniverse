@@ -1,7 +1,7 @@
 """
 cBioPortal_get_genes
 
-Search for genes by keyword
+Search for genes by keyword (gene symbol or alias)
 """
 
 from typing import Any, Optional, Callable
@@ -16,7 +16,7 @@ def cBioPortal_get_genes(
     validate: bool = True,
 ) -> list[Any]:
     """
-    Search for genes by keyword
+    Search for genes by keyword (gene symbol or alias)
 
     Parameters
     ----------

@@ -1,30 +1,27 @@
 """
-PubChem_get_compound_2D_image_by_CID
+biostudies_get_study_files
 
-Get 2D structure image (PNG format) of compound by CID.
+Get list of files associated with a BioStudies study. Returns file metadata including paths, size...
 """
 
 from typing import Any, Optional, Callable
 from ._shared_client import get_shared_client
 
 
-def PubChem_get_compound_2D_image_by_CID(
-    cid: int,
-    image_size: str,
+def biostudies_get_study_files(
+    accession: str,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
     validate: bool = True,
-) -> Any:
+) -> dict[str, Any]:
     """
-    Get 2D structure image (PNG format) of compound by CID.
+    Get list of files associated with a BioStudies study. Returns file metadata including paths, size...
 
     Parameters
     ----------
-    cid : int
-        Compound ID to get image for, e.g., 2244.
-    image_size : str
-        Optional parameter, image size, like "200x200" (default).
+    accession : str
+        BioStudies accession number
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -34,19 +31,16 @@ def PubChem_get_compound_2D_image_by_CID(
 
     Returns
     -------
-    Any
+    dict[str, Any]
     """
     # Handle mutable defaults to avoid B006 linting error
 
     return get_shared_client().run_one_function(
-        {
-            "name": "PubChem_get_compound_2D_image_by_CID",
-            "arguments": {"cid": cid, "image_size": image_size},
-        },
+        {"name": "biostudies_get_study_files", "arguments": {"accession": accession}},
         stream_callback=stream_callback,
         use_cache=use_cache,
         validate=validate,
     )
 
 
-__all__ = ["PubChem_get_compound_2D_image_by_CID"]
+__all__ = ["biostudies_get_study_files"]

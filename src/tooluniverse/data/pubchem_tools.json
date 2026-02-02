@@ -247,13 +247,13 @@
   },
   {
     "name": "PubChem_get_CID_by_compound_name",
-    "description": "Retrieve corresponding CID list (IdentifierList) by chemical name.",
+    "description": "Retrieve corresponding CID list (IdentifierList) by chemical compound name. Note: This tool only works with chemical compound names (e.g., drug names, molecules), not disease names or conditions.",
     "parameter": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Chemical name (e.g., \"Aspirin\" or IUPAC name)."
+          "description": "Chemical compound name (e.g., \"Aspirin\", \"Acetaminophen\") or IUPAC name. Do not use disease names or medical conditions."
         }
       },
       "required": [
@@ -270,17 +270,22 @@
     "type": "PubChemRESTTool",
     "test_examples": [
       {
-        "name": "rheumatoid arthritis"
+        "name": "aspirin"
       }
     ],
     "return_schema": {
       "type": "object",
       "properties": {
-        "error": {
-          "type": "string"
-        },
-        "detail": {
-          "type": "string"
+        "IdentifierList": {
+          "type": "object",
+          "properties": {
+            "CID": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
         }
       }
     }
@@ -452,7 +457,8 @@
       "endpoint": "/compound/cid/{cid}/PNG?image_size={image_size}",
       "use_pugview": false,
       "input_description": "Input is:\n- cid: compound ID;\n- image_size: desired image pixel size, format is \"widthxheight\" (e.g., \"150x150\").",
-      "output_description": "Returns binary PNG image data, conforming to PNG file header format. LLM can save this binary as image file, or provide to downstream visualization."
+      "output_description": "Returns binary PNG image data, conforming to PNG file header format. LLM can save this binary as image file, or provide to downstream visualization.",
+      "return_format": "PNG"
     },
     "type": "PubChemRESTTool",
     "test_examples": [
@@ -461,17 +467,7 @@
         "image_size": "large"
       }
     ],
-    "return_schema": {
-      "type": "object",
-      "properties": {
-        "error": {
-          "type": "string"
-        },
-        "detail": {
-          "type": "string"
-        }
-      }
-    }
+    "return_schema": null
   },
   {
     "name": "PubChem_get_compound_synonyms_by_CID",

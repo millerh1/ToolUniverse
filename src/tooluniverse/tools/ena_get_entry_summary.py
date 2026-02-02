@@ -1,27 +1,27 @@
 """
-Reactome_query_enhanced
+ena_get_entry_summary
 
-Get enhanced information about a specific entity by its Stable ID. Returns additional details bey...
+Get comprehensive summary information for an ENA entry by accession number. Supports EMBL/GenBank...
 """
 
 from typing import Any, Optional, Callable
 from ._shared_client import get_shared_client
 
 
-def Reactome_query_enhanced(
-    stId: str,
+def ena_get_entry_summary(
+    accession: str,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
     validate: bool = True,
 ) -> dict[str, Any]:
     """
-    Get enhanced information about a specific entity by its Stable ID. Returns additional details bey...
+    Get comprehensive summary information for an ENA entry by accession number. Supports EMBL/GenBank...
 
     Parameters
     ----------
-    stId : str
-        Entity Stable ID (pathway, reaction, complex, etc., e.g., 'R-HSA-73817'). To ...
+    accession : str
+        EMBL/GenBank accession number. NOT RefSeq (NC_*, NM_*, NP_*). Examples: 'U000...
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -36,11 +36,11 @@ def Reactome_query_enhanced(
     # Handle mutable defaults to avoid B006 linting error
 
     return get_shared_client().run_one_function(
-        {"name": "Reactome_query_enhanced", "arguments": {"stId": stId}},
+        {"name": "ena_get_entry_summary", "arguments": {"accession": accession}},
         stream_callback=stream_callback,
         use_cache=use_cache,
         validate=validate,
     )
 
 
-__all__ = ["Reactome_query_enhanced"]
+__all__ = ["ena_get_entry_summary"]

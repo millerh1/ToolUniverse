@@ -1,33 +1,33 @@
 """
-FourDN_get_file_metadata
+NCBI_get_sequence
 
-Get detailed metadata for specific 4DN files including Hi-C contact matrices, TAD (Topologically ...
+Retrieve DNA/RNA sequence data from NCBI by accession number. Returns sequences in specified form...
 """
 
 from typing import Any, Optional, Callable
 from ._shared_client import get_shared_client
 
 
-def FourDN_get_file_metadata(
+def NCBI_get_sequence(
     operation: str,
-    file_accession: str,
-    include_full_metadata: Optional[bool] = False,
+    accession: str,
+    format: Optional[str] = "fasta",
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
     validate: bool = True,
-) -> dict[str, Any]:
+) -> Any:
     """
-    Get detailed metadata for specific 4DN files including Hi-C contact matrices, TAD (Topologically ...
+    Retrieve DNA/RNA sequence data from NCBI by accession number. Returns sequences in specified form...
 
     Parameters
     ----------
     operation : str
-
-    file_accession : str
-        4DN file accession (e.g., '4DNFIIA7E3HL'). Obtain by searching with FourDN_se...
-    include_full_metadata : bool
-        Include complete API response in 'metadata' field (default: false). Set to tr...
+        Operation type (fixed: fetch_sequence)
+    accession : str
+        NCBI accession number (e.g., 'U00096', 'NC_045512', 'NM_000546'). Works with ...
+    format : str
+        Sequence format: 'fasta' for FASTA, 'gb' for GenBank, 'embl' for EMBL, 'gp' f...
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -37,17 +37,17 @@ def FourDN_get_file_metadata(
 
     Returns
     -------
-    dict[str, Any]
+    Any
     """
     # Handle mutable defaults to avoid B006 linting error
 
     return get_shared_client().run_one_function(
         {
-            "name": "FourDN_get_file_metadata",
+            "name": "NCBI_get_sequence",
             "arguments": {
                 "operation": operation,
-                "file_accession": file_accession,
-                "include_full_metadata": include_full_metadata,
+                "accession": accession,
+                "format": format,
             },
         },
         stream_callback=stream_callback,
@@ -56,4 +56,4 @@ def FourDN_get_file_metadata(
     )
 
 
-__all__ = ["FourDN_get_file_metadata"]
+__all__ = ["NCBI_get_sequence"]

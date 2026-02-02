@@ -1,7 +1,7 @@
 """
 FourDN_get_download_url
 
-Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: Req...
+Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: (1)...
 """
 
 from typing import Any, Optional, Callable
@@ -17,14 +17,14 @@ def FourDN_get_download_url(
     validate: bool = True,
 ) -> dict[str, Any]:
     """
-    Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: Req...
+    Get download URL and DRS (Data Repository Service) API endpoint for 4DN files. Prerequisites: (1)...
 
     Parameters
     ----------
     operation : str
 
     file_accession : str
-        4DN file accession
+        4DN file accession (e.g., '4DNFIIA7E3HL'). Obtain by searching with FourDN_se...
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
