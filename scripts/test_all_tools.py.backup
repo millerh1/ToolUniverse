@@ -18,8 +18,6 @@ Options:
     --output FILE   Save report to file (default: TOOL_TEST_REPORT.md)
     --skip TOOLS    Skip specific tools (comma-separated, e.g., "agentic,finder,tool")
     --skip-pattern  Skip tools matching pattern (e.g., "agentic*" or "*discovery*")
-    --skip-remote   Skip remote tools that require external servers
-    --skip-mcp      Skip MCP tools that require MCP servers
 """
 
 import argparse
@@ -164,51 +162,51 @@ def parse_test_output(output: str) -> Dict[str, Any]:
         if "Tools Tested:" in line:
             try:
                 stats["tools_tested"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "Tests Run:" in line:
             try:
                 stats["tests_run"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif line.startswith("Passed:"):
             try:
                 # Extract number from "Passed: 12 (100.0%)"
                 parts = line.split(':')[1].strip().split()
                 stats["passed"] = int(parts[0])
-            except (ValueError, IndexError):
+            except:
                 pass
         elif line.startswith("Failed:"):
             try:
                 stats["failed"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "404 Errors:" in line:
             try:
                 stats["errors_404"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "Other Errors:" in line:
             try:
                 stats["errors_other"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "Schema Valid:" in line:
             try:
                 stats["schema_valid"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "Schema Invalid:" in line:
             try:
                 stats["schema_invalid"] = int(line.split(':')[1].strip())
-            except (ValueError, IndexError):
+            except:
                 pass
         elif "Duration:" in line:
             try:
                 # Extract duration from "Duration: 1.23s"
                 duration_str = line.split(':')[1].strip().rstrip('s')
                 stats["duration"] = float(duration_str)
-            except (ValueError, IndexError):
+            except:
                 pass
     
     return stats
@@ -237,41 +235,47 @@ def generate_report(
     
     pass_rate = (total_passed / total_tests * 100) if total_tests > 0 else 0
     
-    lines = []
-    lines.append("# ToolUniverse - Comprehensive Tool Test Report")
-    lines.append("")
-    lines.append(f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append(f"**Total Duration**: {total_duration:.2f}s")
+    lines = [
+        "# ToolUniverse - Comprehensive Tool Test Report",
+        "",
+        f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Total Duration**: {total_duration:.2f}s",
+        "",
+        "---",
+        "",
+        "## Executive Summary",
+        "",
+        f"- **Tool Categories Tested**: {len(results)}",
+        f"- **Total Tools**: {total_tools}",
+        f"- **Total Test Examples**: {total_tests}",
+        f"- **Pass Rate**: {pass_rate:.1f}%",
+    ]
     
     if skipped_tools:
+        lines.append("")
+        skipped_count = len(skipped_tools)
         skipped_list = ", ".join(sorted(skipped_tools))
-        lines.append(f"**Skipped**: {len(skipped_tools)} tool(s) - {skipped_list}")
+        note_msg = f"**Note**: {skipped_count} tool(s) were skipped: {skipped_list}"
+        lines.append(note_msg)
     
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append("## Executive Summary")
-    lines.append("")
-    lines.append(f"- **Tool Categories Tested**: {len(results)}")
-    lines.append(f"- **Total Tools**: {total_tools}")
-    lines.append(f"- **Total Test Examples**: {total_tests}")
-    lines.append(f"- **Pass Rate**: {pass_rate:.1f}%")
-    lines.append("")
-    lines.append("### Overall Statistics")
-    lines.append("")
-    lines.append("| Metric | Count |")
-    lines.append("|--------|-------|")
-    lines.append(f"| ✅ Passed | {total_passed} ({pass_rate:.1f}%) |")
-    lines.append(f"| ❌ Failed | {total_failed} |")
-    lines.append(f"| 🔍 404 Errors | {total_404} |")
-    lines.append(f"| ⚠️  Other Errors | {total_other_errors} |")
-    lines.append(f"| ✓ Schema Valid | {total_schema_valid} |")
-    lines.append(f"| ✗ Schema Invalid | {total_schema_invalid} |")
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append("## Results by Tool Category")
-    lines.append("")
+    lines.extend([
+        "",
+        "### Overall Statistics",
+        "",
+        f"| Metric | Count |",
+        f"|--------|-------|",
+        f"| ✅ Passed | {total_passed} ({pass_rate:.1f}%) |",
+        f"| ❌ Failed | {total_failed} |",
+        f"| 🔍 404 Errors | {total_404} |",
+        f"| ⚠️  Other Errors | {total_other_errors} |",
+        f"| ✓ Schema Valid | {total_schema_valid} |",
+        f"| ✗ Schema Invalid | {total_schema_invalid} |",
+        "",
+        "---",
+        "",
+        "## Results by Tool Category",
+        ""
+    ]
     
     # Sort by category name
     for pattern in sorted(results.keys()):
@@ -288,15 +292,19 @@ def generate_report(
         else:
             status = "✅"
         
-        lines.append(f"### {status} {pattern}")
-        lines.append("")
-        lines.append(f"**Config Files**: {', '.join(f.name for f in config_files)}")
-        lines.append("")
+        lines.extend([
+            f"### {status} {pattern}",
+            "",
+            f"**Config Files**: {', '.join(f.name for f in config_files)}",
+            ""
+        ])
         
         if result.get("error"):
-            lines.append(f"**Status**: ERROR")
-            lines.append(f"**Error**: {result['error']}")
-            lines.append("")
+            lines.extend([
+                f"**Status**: ERROR",
+                f"**Error**: {result['error']}",
+                ""
+            ])
         else:
             tools_tested = result.get("tools_tested", 0)
             tests_run = result.get("tests_run", 0)
@@ -305,27 +313,33 @@ def generate_report(
             
             pattern_pass_rate = (passed / tests_run * 100) if tests_run > 0 else 0
             
-            lines.append("| Metric | Value |")
-            lines.append("|--------|-------|")
-            lines.append(f"| Tools | {tools_tested} |")
-            lines.append(f"| Tests | {tests_run} |")
-            lines.append(f"| Passed | {passed} ({pattern_pass_rate:.1f}%) |")
-            lines.append(f"| Failed | {failed} |")
+            lines.extend([
+                f"| Metric | Value |",
+                f"|--------|-------|",
+                f"| Tools | {tools_tested} |",
+                f"| Tests | {tests_run} |",
+                f"| Passed | {passed} ({pattern_pass_rate:.1f}%) |",
+                f"| Failed | {failed} |",
+            ])
             
             if result.get("errors_404", 0) > 0:
                 lines.append(f"| 404 Errors | {result['errors_404']} |")
             if result.get("errors_other", 0) > 0:
                 lines.append(f"| Other Errors | {result['errors_other']} |")
             
-            lines.append(f"| Schema Valid | {result.get('schema_valid', 0)} |")
-            lines.append(f"| Schema Invalid | {result.get('schema_invalid', 0)} |")
-            lines.append(f"| Duration | {result.get('duration', 0):.2f}s |")
-            lines.append("")
+            lines.extend([
+                f"| Schema Valid | {result.get('schema_valid', 0)} |",
+                f"| Schema Invalid | {result.get('schema_invalid', 0)} |",
+                f"| Duration | {result.get('duration', 0):.2f}s |",
+                ""
+            ])
     
-    lines.append("---")
-    lines.append("")
-    lines.append("## Issues Requiring Attention")
-    lines.append("")
+    lines.extend([
+        "---",
+        "",
+        "## Issues Requiring Attention",
+        ""
+    ])
     
     # List failures
     issues_found = False
@@ -334,10 +348,12 @@ def generate_report(
     patterns_with_404 = [p for p, r in results.items() if r.get("errors_404", 0) > 0]
     if patterns_with_404:
         issues_found = True
-        lines.append("### 🔍 404 Errors Detected")
-        lines.append("")
-        lines.append("These tools are returning 404 errors (API endpoints may have changed):")
-        lines.append("")
+        lines.extend([
+            "### 🔍 404 Errors Detected",
+            "",
+            "These tools are returning 404 errors (API endpoints may have changed):",
+            ""
+        ])
         for pattern in sorted(patterns_with_404):
             count = results[pattern]["errors_404"]
             lines.append(f"- **{pattern}**: {count} 404 error(s)")
@@ -350,10 +366,12 @@ def generate_report(
     ]
     if patterns_with_schema_issues:
         issues_found = True
-        lines.append("### ⚠️  Schema Validation Issues")
-        lines.append("")
-        lines.append("These tools have schema mismatches:")
-        lines.append("")
+        lines.extend([
+            "### ⚠️  Schema Validation Issues",
+            "",
+            "These tools have schema mismatches:",
+            ""
+        ])
         for pattern in sorted(patterns_with_schema_issues):
             count = results[pattern]["schema_invalid"]
             lines.append(f"- **{pattern}**: {count} schema mismatch(es)")
@@ -366,51 +384,67 @@ def generate_report(
     ]
     if patterns_with_failures:
         issues_found = True
-        lines.append("### ❌ Other Failures")
-        lines.append("")
-        lines.append("These tools have other failures:")
-        lines.append("")
+        lines.extend([
+            "### ❌ Other Failures",
+            "",
+            "These tools have other failures:",
+            ""
+        ])
         for pattern in sorted(patterns_with_failures):
             count = results[pattern]["failed"]
             lines.append(f"- **{pattern}**: {count} failure(s)")
         lines.append("")
     
     if not issues_found:
-        lines.append("✨ **No issues found!** All tools are working correctly.")
-        lines.append("")
+        lines.extend([
+            "✨ **No issues found!** All tools are working correctly.",
+            ""
+        ])
     
-    lines.append("---")
-    lines.append("")
-    lines.append("## Next Steps")
-    lines.append("")
+    lines.extend([
+        "---",
+        "",
+        "## Next Steps",
+        ""
+    ])
     
     if patterns_with_404:
-        lines.append("1. **Fix 404 Errors**: Review API documentation for tools with 404 errors")
-        lines.append("   - Check if API endpoints have changed")
-        lines.append("   - Update tool configurations accordingly")
-        lines.append("")
+        lines.extend([
+            "1. **Fix 404 Errors**: Review API documentation for tools with 404 errors",
+            "   - Check if API endpoints have changed",
+            "   - Update tool configurations accordingly",
+            ""
+        ])
     
     if patterns_with_schema_issues:
-        lines.append("2. **Fix Schema Mismatches**: Update return_schema definitions")
-        lines.append("   - Review actual API responses")
-        lines.append("   - Update JSON schemas to match current API")
-        lines.append("")
+        lines.extend([
+            "2. **Fix Schema Mismatches**: Update return_schema definitions",
+            "   - Review actual API responses",
+            "   - Update JSON schemas to match current API",
+            ""
+        ])
     
     if patterns_with_failures:
-        lines.append("3. **Investigate Failures**: Review error messages and fix issues")
-        lines.append("   - Check API keys and authentication")
-        lines.append("   - Verify network connectivity")
-        lines.append("   - Review error messages in detail")
-        lines.append("")
+        lines.extend([
+            "3. **Investigate Failures**: Review error messages and fix issues",
+            "   - Check API keys and authentication",
+            "   - Verify network connectivity",
+            "   - Review error messages in detail",
+            ""
+        ])
     
     if not issues_found:
-        lines.append("✅ All tools validated successfully! No action needed.")
-        lines.append("")
+        lines.extend([
+            "✅ All tools validated successfully! No action needed.",
+            ""
+        ])
     
-    lines.append("---")
-    lines.append("")
-    lines.append(f"**Report Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append("**Command**: `python scripts/test_all_tools.py`")
+    lines.extend([
+        "---",
+        "",
+        f"**Report Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Command**: `python scripts/test_all_tools.py`",
+    ])
     
     report = "\n".join(lines)
     
@@ -459,16 +493,6 @@ def main():
         "--skip-pattern",
         help="Skip tools matching wildcard pattern (e.g., 'agentic*' or '*discovery*')"
     )
-    parser.add_argument(
-        "--skip-remote",
-        action="store_true",
-        help="Skip remote tools that require external servers"
-    )
-    parser.add_argument(
-        "--skip-mcp",
-        action="store_true",
-        help="Skip MCP (Model Context Protocol) tools that require MCP servers"
-    )
     
     args = parser.parse_args()
     
@@ -499,25 +523,6 @@ def main():
     if args.skip:
         skip_tools.update(tool.strip() for tool in args.skip.split(','))
         print(f"📝 Skipping tools: {', '.join(sorted(skip_tools))}")
-    
-    # Skip remote tools if requested
-    if args.skip_remote:
-        remote_tools = [
-            'boltz', 'depmap', 'expert_feedback', 'immune_compass', 
-            'pinnacle', 'transcriptformer', 'uspto_downloader',
-            # Add external API services that require remote servers
-            'blast',  # NCBI BLAST API
-            'simbad',  # SIMBAD astronomical database API
-            'uspto',  # USPTO Patent API (in addition to uspto_downloader)
-        ]
-        skip_tools.update(remote_tools)
-        print(f"🌐 Skipping remote tools (require external servers): {', '.join(sorted(remote_tools))}")
-    
-    # Skip MCP tools if requested
-    if args.skip_mcp:
-        mcp_tools = ['boltz_mcp_loader', 'mcp_client_example', 'mcpautoloadertool']
-        skip_tools.update(mcp_tools)
-        print(f"🔌 Skipping MCP tools (require MCP servers): {', '.join(sorted(mcp_tools))}")
     
     # Apply skip pattern
     if args.skip_pattern:
@@ -554,10 +559,11 @@ def main():
             print(f"⏭️  Skipped {skipped_count} tool(s)")
     
     if not config_patterns:
-        print("❌ No tools remaining after filtering")
+        print(f"❌ No tools remaining after filtering")
         sys.exit(1)
     
     print(f"✅ Found {len(config_patterns)} unique tool patterns to test")
+    
     print()
     print("🧪 Running tests...")
     print()
@@ -567,6 +573,8 @@ def main():
     start_time = time.time()
     
     for i, pattern in enumerate(sorted(config_patterns.keys()), 1):
+        config_files_for_pattern = config_patterns[pattern]
+        
         print(f"[{i}/{len(config_patterns)}] Testing {pattern}...", end=" ", flush=True)
         
         result = run_test_for_pattern(
@@ -623,8 +631,6 @@ def main():
     print(f"Passed:           {total_passed}")
     print(f"Failed:           {total_failed}")
     print(f"Duration:         {total_duration:.2f}s")
-    if skip_tools:
-        print(f"Skipped:          {len(skip_tools)} tool(s)")
     print("=" * 70)
     
     # Exit with error if any tests failed
