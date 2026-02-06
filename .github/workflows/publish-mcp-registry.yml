@@ -1,9 +1,13 @@
 name: Publish to MCP Registry
 
 on:
-  # Trigger after PyPI workflow creates a release
-  release:
-    types: [published]
+  # Called by PyPI workflow after successful publish
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to publish'
+        required: true
+        type: string
   # Allow manual trigger
   workflow_dispatch:
     inputs:
@@ -26,14 +30,11 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-            # Remove 'v' prefix if present
-            VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"
+          # inputs.version works for both workflow_call and workflow_dispatch
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
           else
-            # Extract from pyproject.toml
+            # Fallback: extract from pyproject.toml
             VERSION=$(grep -oP '(?<=version = ")[^"]+' pyproject.toml)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
