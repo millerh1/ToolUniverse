@@ -125,6 +125,196 @@ Complete reference of 225+ ToolUniverse tools for target research, organized by 
 | `STITCH_get_interaction_partners` | `identifiers`, `species` | Interaction network |
 | `STITCH_resolve_identifier` | `identifier`, `species` | ID resolution |
 
+### GPCRdb (NEW - for GPCR Targets)
+
+~35% of approved drugs target GPCRs. GPCRdb provides specialized data for G protein-coupled receptors.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `GPCRdb_get_protein` | `operation="get_protein"`, `protein` (entry name) | GPCR family, class, sequence info |
+| `GPCRdb_list_proteins` | `operation="list_proteins"`, `family` (optional) | List GPCR families/proteins |
+| `GPCRdb_get_structures` | `operation="get_structures"`, `protein`, `state` (optional) | Structures with receptor state (active/inactive) |
+| `GPCRdb_get_ligands` | `operation="get_ligands"`, `protein` | Known ligands (agonists/antagonists) |
+| `GPCRdb_get_mutations` | `operation="get_mutations"`, `protein` | Mutation effects on binding/signaling |
+
+**Entry name format**: `{gene_lower}_human` (e.g., `adrb2_human`, `drd2_human`)
+
+**Key advantages**:
+- Active vs. inactive state structures
+- Ballesteros-Weinstein residue numbering
+- Curated ligand binding data
+- Experimental mutation effects
+
+### Pharos/TCRD (NEW - Target Development Level)
+
+NIH's Illuminating the Druggable Genome (IDG) portal provides TDL classification.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `Pharos_get_target` | `gene` OR `uniprot` | TDL, family, novelty, description |
+| `Pharos_search_targets` | `query`, `top` | Target list with TDL |
+| `Pharos_get_tdl_summary` | - | TDL level descriptions |
+| `Pharos_get_disease_targets` | `disease`, `top` | Targets for disease with TDL |
+
+**TDL Classification**:
+| Level | Description | Druggability |
+|-------|-------------|--------------|
+| **Tclin** | Approved drug targets | Highest |
+| **Tchem** | Small molecule activities (IC50 < 30nM) | Good |
+| **Tbio** | Biological annotations only | Moderate |
+| **Tdark** | Understudied proteins | Unknown |
+
+**Example**:
+```python
+result = tu.tools.Pharos_get_target(gene="EGFR")
+# Returns: tdl="Tclin", fam="Kinase", novelty=0.2, publicationCount=45000
+```
+
+### DepMap (NEW - Target Essentiality)
+
+CRISPR knockout essentiality data from cancer cell lines.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `DepMap_get_gene_dependencies` | `gene_symbol` | Gene essentiality data |
+| `DepMap_get_cell_lines` | `tissue`, `cancer_type`, `page_size` | Cell line metadata |
+| `DepMap_search_cell_lines` | `query` | Search cell lines |
+| `DepMap_get_cell_line` | `model_id` OR `model_name` | Detailed cell line info |
+| `DepMap_get_drug_response` | `drug_name` | Drug sensitivity data |
+
+**Effect Score Interpretation**:
+| Score | Meaning |
+|-------|---------|
+| < -1.0 | Strongly essential |
+| -0.5 to -1.0 | Essential |
+| -0.5 to 0 | Weakly essential |
+| > 0 | Not essential |
+
+**Example**:
+```python
+deps = tu.tools.DepMap_get_gene_dependencies(gene_symbol="KRAS")
+# Returns: Gene info, note about essentiality
+
+cells = tu.tools.DepMap_get_cell_lines(cancer_type="Lung Cancer", page_size=10)
+# Returns: Cell line names, cancer types, MSI status
+```
+
+### InterProScan (NEW - Domain Prediction)
+
+De novo domain/family prediction for novel sequences.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `InterProScan_scan_sequence` | `sequence`, `go_terms`, `pathways` | Domains, GO terms, pathways |
+| `InterProScan_get_job_status` | `job_id` | Job status |
+| `InterProScan_get_job_results` | `job_id` | Completed results |
+
+**When to use**: Novel proteins, Tdark targets, custom sequences.
+
+**Example**:
+```python
+# Submit sequence for analysis
+result = tu.tools.InterProScan_scan_sequence(
+    sequence="MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSH...",
+    go_terms=True,
+    pathways=True
+)
+# Returns: job_id (if running) or domains/GO/pathways (if complete)
+
+# Check job if still running
+status = tu.tools.InterProScan_get_job_status(job_id="iprscan5-xxx")
+results = tu.tools.InterProScan_get_job_results(job_id="iprscan5-xxx")
+```
+
+### BindingDB (NEW - Ligand Binding Data)
+
+Experimental binding affinity data (Ki, IC50, Kd) for target-ligand pairs.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `BindingDB_get_ligands_by_uniprot` | `uniprot`, `affinity_cutoff` | Ligands with affinities |
+| `BindingDB_get_ligands_by_uniprots` | `uniprots`, `affinity_cutoff` | Multi-target ligands |
+| `BindingDB_get_ligands_by_pdb` | `pdb_ids`, `affinity_cutoff`, `sequence_identity` | Structure-based ligands |
+| `BindingDB_get_targets_by_compound` | `smiles`, `similarity_cutoff` | Polypharmacology |
+
+**Example**:
+```python
+# Get ligands for EGFR
+ligands = tu.tools.BindingDB_get_ligands_by_uniprot(
+    uniprot="P00533",
+    affinity_cutoff=100  # Only potent ligands <100 nM
+)
+# Returns: SMILES, affinity_type (Ki/IC50/Kd), affinity value, PMID
+
+# Find targets for a compound
+targets = tu.tools.BindingDB_get_targets_by_compound(
+    smiles="CC(=O)Nc1ccc(cc1)O",
+    similarity_cutoff=0.85
+)
+# Returns: proteins with similar compound activities
+```
+
+**Affinity Interpretation**:
+| Range | Level | Drug Potential |
+|-------|-------|----------------|
+| <1 nM | Ultra-potent | Clinical candidate |
+| 1-30 nM | Tchem threshold | Drug-like |
+| 30-100 nM | Potent | Good start |
+| 100-1000 nM | Moderate | Needs optimization |
+
+### Human Protein Atlas (NEW - Expression)
+
+Protein and RNA expression across tissues and cell lines.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `HPA_search_genes_by_query` | `search_query` | Gene info, Ensembl ID |
+| `HPA_generic_search` | `search_query`, `columns` | Custom data fields |
+| `HPA_get_comparative_expression_by_gene_and_cellline` | `gene_name`, `cell_line` | Cancer vs normal |
+
+**Example**:
+```python
+# Search gene
+gene = tu.tools.HPA_search_genes_by_query(search_query="EGFR")
+# Returns: Gene name, Ensembl ID, synonyms
+
+# Compare cancer cell line vs normal tissue
+expr = tu.tools.HPA_get_comparative_expression_by_gene_and_cellline(
+    gene_name="EGFR",
+    cell_line="a549"  # Lung cancer
+)
+# Returns: expression comparison
+```
+
+**Supported Cell Lines**: a549, mcf7, hela, hepg2, pc3, jurkat, rh30, siha, u251, ishikawa
+
+### PubChem BioAssay (NEW - Screening Data)
+
+HTS screening data and dose-response curves.
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `PubChem_search_assays_by_target_gene` | `gene_symbol` | AIDs for gene |
+| `PubChem_get_assay_summary` | `aid` | Assay statistics |
+| `PubChem_get_assay_targets` | `aid` | Target info |
+| `PubChem_get_assay_active_compounds` | `aid` | Active CIDs |
+| `PubChem_get_assay_dose_response` | `aid` | IC50/EC50 data |
+
+**Example**:
+```python
+# Find assays for target
+assays = tu.tools.PubChem_search_assays_by_target_gene(gene_symbol="EGFR")
+# Returns: list of AIDs
+
+# Get assay summary
+summary = tu.tools.PubChem_get_assay_summary(aid=504526)
+# Returns: active/inactive counts, target info
+
+# Get active compounds
+actives = tu.tools.PubChem_get_assay_active_compounds(aid=504526)
+# Returns: CIDs of active compounds
+```
+
 ## 4. Open Targets Platform
 
 ### Target-Centric
@@ -456,6 +646,29 @@ Complete reference of 225+ ToolUniverse tools for target research, organized by 
 | `GtoPdb_get_disease` | `disease_id` | Disease details |
 | `Reactome_get_diseases` | - | Reactome diseases |
 | `OSL_get_efo_id_by_disease_name` | `disease_name` | EFO ID lookup |
+
+### DisGeNET (NEW - Gene-Disease Associations)
+
+DisGeNET integrates gene-disease associations from curated repositories, GWAS catalogs, animal models, and literature. **Requires**: `DISGENET_API_KEY`
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `DisGeNET_search_gene` | `operation="search_gene"`, `gene` (symbol/ID), `limit` | Diseases associated with gene |
+| `DisGeNET_search_disease` | `operation="search_disease"`, `disease` (name/UMLS CUI), `limit` | Genes associated with disease |
+| `DisGeNET_get_gda` | `operation="get_gda"`, `gene`, `disease`, `min_score` | Gene-disease association details |
+| `DisGeNET_get_vda` | `operation="get_vda"`, `variant` (rsID), `limit` | Variant-disease associations |
+| `DisGeNET_get_disease_genes` | `operation="get_disease_genes"`, `disease`, `limit` | All genes for a disease |
+
+**Key metrics**:
+- **GDA Score**: 0-1 confidence score for gene-disease association
+- **Evidence Index**: Number and diversity of sources
+- **Disease Specificity Index**: How specific is gene to this disease
+- **Disease Pleiotropy Index**: How many diseases gene is linked to
+
+**Interpretation**:
+- Score ≥0.7: Strong association (consider T2 evidence)
+- Score 0.4-0.7: Moderate association
+- Score <0.4: Weak/limited evidence
 
 ## 14. ID Conversion & Cross-References
 

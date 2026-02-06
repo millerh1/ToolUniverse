@@ -106,6 +106,11 @@ class TestOMIMToolInterface:
 
     def test_tools_registered(self, tu):
         """Test that OMIM tools are registered."""
+        # OMIM tools require API key - skip if not loaded
+        import os
+        if not os.environ.get("OMIM_API_KEY"):
+            pytest.skip("OMIM_API_KEY not set")
+        
         assert hasattr(tu.tools, "OMIM_search")
         assert hasattr(tu.tools, "OMIM_get_entry")
         assert hasattr(tu.tools, "OMIM_get_gene_map")

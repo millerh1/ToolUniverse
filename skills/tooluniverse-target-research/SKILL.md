@@ -140,15 +140,26 @@ Execute 9 research paths (Path 0 is always first):
 ```
 Target Query (e.g., "EGFR" or "P00533")
 │
+├─ IDENTIFIER RESOLUTION (always first)
+│   └─ Check if GPCR → GPCRdb_get_protein
+│
 ├─ PATH 0: Open Targets Foundation (ALWAYS FIRST - fills gaps in all other paths)
 │
 ├─ PATH 1: Core Identity (names, IDs, sequence, organism)
+│   └─ InterProScan_scan_sequence for novel domain prediction (NEW)
 ├─ PATH 2: Structure & Domains (3D structure, domains, binding sites)
+│   └─ If GPCR: GPCRdb_get_structures (active/inactive states)
 ├─ PATH 3: Function & Pathways (GO terms, pathways, biological role)
 ├─ PATH 4: Protein Interactions (PPI network, complexes)
 ├─ PATH 5: Expression Profile (tissue expression, single-cell)
 ├─ PATH 6: Variants & Disease (mutations, clinical significance)
+│   └─ DisGeNET_search_gene for curated gene-disease associations
 ├─ PATH 7: Drug Interactions (known drugs, druggability, safety)
+│   ├─ Pharos_get_target for TDL classification (Tclin/Tchem/Tbio/Tdark)
+│   ├─ BindingDB_get_ligands_by_uniprot for known ligands (NEW)
+│   ├─ PubChem_search_assays_by_target_gene for HTS data (NEW)
+│   ├─ If GPCR: GPCRdb_get_ligands (curated agonists/antagonists)
+│   └─ DepMap_get_gene_dependencies for target essentiality
 └─ PATH 8: Literature & Research (publications, trends)
 ```
 
@@ -197,6 +208,78 @@ def resolve_target_ids(tu, query):
             ids['synonyms'].extend(alt_names)
     
     return ids
+```
+
+### GPCR Target Detection (NEW)
+
+~35% of approved drugs target GPCRs. After identifier resolution, check if target is a GPCR:
+
+```python
+def check_gpcr_target(tu, ids):
+    """
+    Check if target is a GPCR and retrieve specialized data.
+    Call after identifier resolution.
+    """
+    symbol = ids.get('symbol', '')
+    
+    # Build GPCRdb entry name
+    entry_name = f"{symbol.lower()}_human"
+    
+    gpcr_info = tu.tools.GPCRdb_get_protein(
+        operation="get_protein",
+        protein=entry_name
+    )
+    
+    if gpcr_info.get('status') == 'success':
+        # Target is a GPCR - get specialized data
+        
+        # Get structures with receptor state
+        structures = tu.tools.GPCRdb_get_structures(
+            operation="get_structures",
+            protein=entry_name
+        )
+        
+        # Get known ligands (critical for binder projects)
+        ligands = tu.tools.GPCRdb_get_ligands(
+            operation="get_ligands",
+            protein=entry_name
+        )
+        
+        # Get mutation data
+        mutations = tu.tools.GPCRdb_get_mutations(
+            operation="get_mutations",
+            protein=entry_name
+        )
+        
+        return {
+            'is_gpcr': True,
+            'gpcr_family': gpcr_info['data'].get('family'),
+            'gpcr_class': gpcr_info['data'].get('receptor_class'),
+            'structures': structures.get('data', {}).get('structures', []),
+            'ligands': ligands.get('data', {}).get('ligands', []),
+            'mutations': mutations.get('data', {}).get('mutations', []),
+            'ballesteros_numbering': True  # GPCRdb provides this
+        }
+    
+    return {'is_gpcr': False}
+```
+
+**GPCRdb Report Section** (add to Section 2 for GPCR targets):
+
+```markdown
+### 2.x GPCR-Specific Data (GPCRdb)
+
+**Receptor Class**: Class A (Rhodopsin-like)  
+**GPCR Family**: Adrenoceptors  
+
+**Structures by State**:
+| PDB ID | State | Resolution | Ligand | Year |
+|--------|-------|------------|--------|------|
+| 3SN6 | Active | 3.2Å | Agonist (BI-167107) | 2011 |
+| 2RH1 | Inactive | 2.4Å | Antagonist (carazolol) | 2007 |
+
+**Known Ligands**: 45 agonists, 32 antagonists, 8 allosteric modulators  
+**Key Binding Site Residues** (Ballesteros-Weinstein): 3.32, 5.42, 6.48, 7.39
 ```
 
 ### Collision Detection for Literature Search
@@ -474,11 +557,91 @@ def path_expression(tu, ids):
     return results
 ```
 
+### Human Protein Atlas - Extended Expression (NEW)
+
+HPA provides comprehensive protein expression data including tissue-level, cell-level, and cell line expression.
+
+```python
+def get_hpa_comprehensive_expression(tu, gene_symbol):
+    """
+    Get comprehensive expression data from Human Protein Atlas.
+    
+    Provides:
+    - Tissue expression (protein and RNA)
+    - Subcellular localization
+    - Cell line expression comparison
+    - Tissue specificity
+    """
+    
+    # 1. Search for gene to get IDs
+    gene_info = tu.tools.HPA_search_genes_by_query(search_query=gene_symbol)
+    
+    if not gene_info:
+        return {'error': f'Gene {gene_symbol} not found in HPA'}
+    
+    # 2. Get tissue expression with specificity
+    tissue_search = tu.tools.HPA_generic_search(
+        search_query=gene_symbol,
+        columns="g,gs,rnat,rnatsm,scml,scal",  # Gene, synonyms, tissue specificity, subcellular
+        format="json"
+    )
+    
+    # 3. Compare expression in cancer cell lines vs normal tissue
+    cell_lines = ['a549', 'mcf7', 'hela', 'hepg2', 'pc3']
+    cell_line_expression = {}
+    
+    for cell_line in cell_lines:
+        try:
+            expr = tu.tools.HPA_get_comparative_expression_by_gene_and_cellline(
+                gene_name=gene_symbol,
+                cell_line=cell_line
+            )
+            cell_line_expression[cell_line] = expr
+        except:
+            continue
+    
+    return {
+        'gene_info': gene_info,
+        'tissue_data': tissue_search,
+        'cell_line_expression': cell_line_expression,
+        'source': 'Human Protein Atlas'
+    }
+```
+
+**HPA Expression Output for Report**:
+```markdown
+### Tissue Expression Profile (Human Protein Atlas)
+
+| Tissue | Protein Level | RNA nTPM | Specificity |
+|--------|---------------|----------|-------------|
+| Brain | High | 45.2 | Enriched |
+| Liver | Medium | 23.1 | Enhanced |
+| Kidney | Low | 8.4 | Not detected |
+
+**Subcellular Localization**: Cytoplasm, Plasma membrane
+
+### Cancer Cell Line Expression
+
+| Cell Line | Cancer Type | Expression | vs Normal |
+|-----------|-------------|------------|-----------|
+| A549 | Lung | High | Elevated |
+| MCF7 | Breast | Medium | Similar |
+| HeLa | Cervical | High | Elevated |
+
+*Source: Human Protein Atlas via `HPA_search_genes_by_query`, `HPA_get_comparative_expression_by_gene_and_cellline`*
+```
+
+**Why HPA for Target Research**:
+- **Drug target validation** - Confirm expression in target tissue
+- **Safety assessment** - Expression in essential organs
+- **Biomarker potential** - Tissue-specific expression
+- **Cell line selection** - Choose appropriate models
+
 ---
 
 ## PATH 6: Variants & Disease (Enhanced)
 
-### ClinVar SNV vs CNV Separation
+### 6.1 ClinVar SNV vs CNV Separation
 
 ```markdown
 ### 8.3 Clinical Variants (ClinVar)
@@ -497,6 +660,516 @@ def path_expression(tu, ids):
 | Amplification | 7p11.2 | Pathogenic | Common in cancer |
 
 *Note: CNV data separated as it represents different mutation mechanism*
+```
+
+### 6.2 DisGeNET Integration (NEW)
+
+DisGeNET provides curated gene-disease associations with evidence scores. **Requires**: `DISGENET_API_KEY`
+
+```python
+def get_disgenet_associations(tu, ids):
+    """
+    Get gene-disease associations from DisGeNET.
+    Complements Open Targets with curated association scores.
+    """
+    symbol = ids.get('symbol')
+    if not symbol:
+        return {'status': 'skipped', 'reason': 'No gene symbol'}
+    
+    # Get all disease associations for gene
+    gda = tu.tools.DisGeNET_search_gene(
+        operation="search_gene",
+        gene=symbol,
+        limit=50
+    )
+    
+    if gda.get('status') != 'success':
+        return {'status': 'error', 'message': 'DisGeNET query failed'}
+    
+    associations = gda.get('data', {}).get('associations', [])
+    
+    # Categorize by evidence strength
+    strong = []     # score >= 0.7
+    moderate = []   # score 0.4-0.7  
+    weak = []       # score < 0.4
+    
+    for assoc in associations:
+        score = assoc.get('score', 0)
+        disease_name = assoc.get('disease_name', '')
+        umls_cui = assoc.get('disease_id', '')
+        
+        entry = {
+            'disease': disease_name,
+            'umls_cui': umls_cui,
+            'score': score,
+            'evidence_index': assoc.get('ei'),
+            'dsi': assoc.get('dsi'),  # Disease Specificity Index
+            'dpi': assoc.get('dpi')   # Disease Pleiotropy Index
+        }
+        
+        if score >= 0.7:
+            strong.append(entry)
+        elif score >= 0.4:
+            moderate.append(entry)
+        else:
+            weak.append(entry)
+    
+    return {
+        'total_associations': len(associations),
+        'strong_associations': strong,
+        'moderate_associations': moderate,
+        'weak_associations': weak[:10],  # Limit weak
+        'disease_pleiotropy': len(associations)  # How many diseases linked
+    }
+```
+
+**DisGeNET Report Section** (add to Section 8 - Disease Associations):
+
+```markdown
+### 8.x DisGeNET Gene-Disease Associations (NEW)
+
+**Total Diseases Associated**: 47  
+**Disease Pleiotropy Index**: High (gene linked to many disease types)
+
+#### Strong Associations (Score ≥0.7)
+| Disease | UMLS CUI | Score | Evidence Index |
+|---------|----------|-------|----------------|
+| Non-small cell lung cancer | C0007131 | 0.85 | 0.92 |
+| Glioblastoma | C0017636 | 0.78 | 0.88 |
+
+#### Moderate Associations (Score 0.4-0.7)
+| Disease | UMLS CUI | Score | DSI |
+|---------|----------|-------|-----|
+| Breast cancer | C0006142 | 0.62 | 0.45 |
+
+*Note: DisGeNET score integrates curated databases, GWAS, animal models, and literature*
+```
+
+**Evidence Tier Assignment**:
+- DisGeNET Score ≥0.7 → Consider T2 evidence (multiple validated sources)
+- DisGeNET Score 0.4-0.7 → Consider T3 evidence
+- DisGeNET Score <0.4 → T4 evidence only
+
+---
+
+## PATH 7: Druggability & Target Validation (ENHANCED)
+
+### 7.1 Pharos/TCRD - Target Development Level (NEW)
+
+NIH's Illuminating the Druggable Genome (IDG) portal provides TDL classification for all human proteins:
+
+```python
+def get_pharos_target_info(tu, ids):
+    """
+    Get Pharos/TCRD target development level and druggability.
+    
+    TDL Classification:
+    - Tclin: Approved drug targets
+    - Tchem: Targets with small molecule activities (IC50 < 30nM)
+    - Tbio: Targets with biological annotations
+    - Tdark: Understudied proteins
+    """
+    gene_symbol = ids.get('symbol')
+    uniprot = ids.get('uniprot')
+    
+    # Try by gene symbol first
+    if gene_symbol:
+        result = tu.tools.Pharos_get_target(
+            gene=gene_symbol
+        )
+    elif uniprot:
+        result = tu.tools.Pharos_get_target(
+            uniprot=uniprot
+        )
+    else:
+        return {'status': 'error', 'message': 'Need gene symbol or UniProt'}
+    
+    if result.get('status') == 'success' and result.get('data'):
+        target = result['data']
+        return {
+            'name': target.get('name'),
+            'symbol': target.get('sym'),
+            'tdl': target.get('tdl'),  # Tclin/Tchem/Tbio/Tdark
+            'family': target.get('fam'),  # Kinase, GPCR, etc.
+            'novelty': target.get('novelty'),
+            'description': target.get('description'),
+            'publications': target.get('publicationCount'),
+            'interpretation': interpret_tdl(target.get('tdl'))
+        }
+    return None
+
+def interpret_tdl(tdl):
+    """Interpret Target Development Level for druggability."""
+    interpretations = {
+        'Tclin': 'Approved drug target - highest confidence for druggability',
+        'Tchem': 'Small molecule active - good chemical tractability',
+        'Tbio': 'Biologically characterized - may require novel modalities',
+        'Tdark': 'Understudied - limited data, high novelty potential'
+    }
+    return interpretations.get(tdl, 'Unknown')
+
+def search_disease_targets(tu, disease_name):
+    """Find targets associated with a disease via Pharos."""
+    
+    result = tu.tools.Pharos_get_disease_targets(
+        disease=disease_name,
+        top=50
+    )
+    
+    if result.get('status') == 'success':
+        targets = result['data'].get('targets', [])
+        # Group by TDL for prioritization
+        by_tdl = {'Tclin': [], 'Tchem': [], 'Tbio': [], 'Tdark': []}
+        for t in targets:
+            tdl = t.get('tdl', 'Unknown')
+            if tdl in by_tdl:
+                by_tdl[tdl].append(t)
+        return by_tdl
+    return None
+```
+
+**Pharos Report Section** (add to Section 9 - Druggability):
+
+```markdown
+### 9.x Pharos/TCRD Target Classification (NEW)
+
+**Target Development Level**: Tchem  
+**Protein Family**: Kinase  
+**Novelty Score**: 0.35 (moderately studied)  
+**Publication Count**: 12,456
+
+**TDL Interpretation**: Target has validated small molecule activities with IC50 < 30nM. Good chemical starting points exist.
+
+**Disease Targets Analysis** (for disease-centric queries):
+| TDL | Count | Examples |
+|-----|-------|----------|
+| Tclin | 12 | EGFR, ALK, RET |
+| Tchem | 45 | KRAS, SHP2, CDK4 |
+| Tbio | 78 | Novel kinases |
+| Tdark | 23 | Understudied |
+
+*Source: Pharos/TCRD via `Pharos_get_target`*
+```
+
+### 7.2 DepMap - Target Essentiality Validation (NEW)
+
+CRISPR knockout data from cancer cell lines to validate target essentiality:
+
+```python
+def assess_target_essentiality(tu, ids):
+    """
+    Is this target essential for cancer cell survival?
+    
+    Negative effect scores = gene is essential (cells die upon KO)
+    """
+    gene_symbol = ids.get('symbol')
+    
+    if not gene_symbol:
+        return {'status': 'error', 'message': 'Need gene symbol'}
+    
+    deps = tu.tools.DepMap_get_gene_dependencies(
+        gene_symbol=gene_symbol
+    )
+    
+    if deps.get('status') == 'success':
+        return {
+            'gene': gene_symbol,
+            'data': deps.get('data', {}),
+            'interpretation': 'Negative scores indicate gene is essential for cell survival',
+            'note': 'Score < -0.5 is strongly essential, < -1.0 is extremely essential'
+        }
+    return None
+
+def get_cancer_type_essentiality(tu, gene_symbol, cancer_type):
+    """Check if gene is essential in specific cancer type."""
+    
+    # Get cell lines for cancer type
+    cell_lines = tu.tools.DepMap_get_cell_lines(
+        cancer_type=cancer_type,
+        page_size=20
+    )
+    
+    return {
+        'gene': gene_symbol,
+        'cancer_type': cancer_type,
+        'cell_lines': cell_lines.get('data', {}).get('cell_lines', []),
+        'note': 'Query individual cell lines for dependency scores via DepMap portal'
+    }
+```
+
+**DepMap Report Section** (add to Section 9 - Druggability):
+
+```markdown
+### 9.x Target Essentiality (DepMap) (NEW)
+
+**Gene Essentiality Assessment**:
+| Context | Effect Score | Interpretation |
+|---------|--------------|----------------|
+| Pan-cancer | -0.42 | Moderately essential |
+| Lung cancer | -0.78 | Strongly essential |
+| Breast cancer | -0.21 | Weakly essential |
+
+**Selectivity**: Differential essentiality suggests cancer-type selective target
+
+**Cell Lines Tested**: 1,054 cancer cell lines from DepMap
+
+*Interpretation*: Score < -0.5 indicates strong dependency. This target is more essential in lung cancer than other cancer types - suggesting lung-selective targeting may be feasible.
+
+*Source: DepMap via `DepMap_get_gene_dependencies`*
+```
+
+### 7.3 InterProScan - Novel Domain Prediction (NEW)
+
+For uncharacterized proteins, run InterProScan to predict domains and function:
+
+```python
+def predict_protein_domains(tu, sequence, title="Query protein"):
+    """
+    Run InterProScan for de novo domain prediction.
+    
+    Use when:
+    - Protein has no InterPro annotations
+    - Novel/uncharacterized protein
+    - Custom sequence analysis
+    """
+    
+    result = tu.tools.InterProScan_scan_sequence(
+        sequence=sequence,
+        title=title,
+        go_terms=True,
+        pathways=True
+    )
+    
+    if result.get('status') == 'success':
+        data = result.get('data', {})
+        
+        # Job may still be running
+        if data.get('job_status') == 'RUNNING':
+            return {
+                'job_id': data.get('job_id'),
+                'status': 'running',
+                'note': 'Use InterProScan_get_job_results to retrieve when ready'
+            }
+        
+        # Parse completed results
+        return {
+            'domains': data.get('domains', []),
+            'domain_count': data.get('domain_count', 0),
+            'go_annotations': data.get('go_annotations', []),
+            'pathways': data.get('pathways', []),
+            'sequence_length': data.get('sequence_length')
+        }
+    return None
+
+def check_interproscan_job(tu, job_id):
+    """Check status and get results for InterProScan job."""
+    
+    status = tu.tools.InterProScan_get_job_status(job_id=job_id)
+    
+    if status.get('data', {}).get('is_finished'):
+        results = tu.tools.InterProScan_get_job_results(job_id=job_id)
+        return results.get('data', {})
+    
+    return status.get('data', {})
+```
+
+**When to use InterProScan**:
+- Novel/uncharacterized proteins (Tdark in Pharos)
+- Custom sequences (e.g., protein variants)
+- Proteins with outdated/sparse InterPro annotations
+- Validating domain predictions
+
+**InterProScan Report Section** (for novel proteins):
+
+```markdown
+### Domain Prediction (InterProScan) (NEW)
+
+*Used for uncharacterized protein analysis*
+
+**Predicted Domains**:
+| Domain | Database | Start-End | E-value | InterPro Entry |
+|--------|----------|-----------|---------|----------------|
+| Protein kinase domain | Pfam | 45-305 | 1.2e-89 | IPR000719 |
+| SH2 domain | SMART | 320-410 | 3.4e-45 | IPR000980 |
+
+**Predicted GO Terms**:
+- GO:0004672 protein kinase activity
+- GO:0005524 ATP binding
+
+**Predicted Pathways**:
+- Reactome: Signal Transduction
+
+*Source: InterProScan via `InterProScan_scan_sequence`*
+```
+
+### 7.4 BindingDB - Known Ligands & Binding Data (NEW)
+
+BindingDB provides experimental binding affinity data (Ki, IC50, Kd) for target-ligand pairs:
+
+```python
+def get_bindingdb_ligands(tu, uniprot_id, affinity_cutoff=10000):
+    """
+    Get ligands with measured binding affinities from BindingDB.
+    
+    Critical for:
+    - Identifying chemical starting points
+    - Understanding existing chemical matter
+    - Assessing tractability with small molecules
+    
+    Args:
+        uniprot_id: UniProt accession (e.g., P00533 for EGFR)
+        affinity_cutoff: Maximum affinity in nM (lower = more potent)
+    """
+    
+    # Get ligands by UniProt
+    result = tu.tools.BindingDB_get_ligands_by_uniprot(
+        uniprot=uniprot_id,
+        affinity_cutoff=affinity_cutoff
+    )
+    
+    if result:
+        ligands = []
+        for entry in result:
+            ligands.append({
+                'smiles': entry.get('smile'),
+                'affinity_type': entry.get('affinity_type'),  # Ki, IC50, Kd
+                'affinity_nM': entry.get('affinity'),
+                'monomer_id': entry.get('monomerid'),
+                'pmid': entry.get('pmid')
+            })
+        
+        # Sort by affinity (most potent first)
+        ligands.sort(key=lambda x: float(x['affinity_nM']) if x['affinity_nM'] else float('inf'))
+        
+        return {
+            'total_ligands': len(ligands),
+            'ligands': ligands[:20],  # Top 20 most potent
+            'best_affinity': ligands[0]['affinity_nM'] if ligands else None
+        }
+    
+    return {'total_ligands': 0, 'ligands': [], 'note': 'No ligands found in BindingDB'}
+
+def get_ligands_by_structure(tu, pdb_id, affinity_cutoff=10000):
+    """Get ligands for a protein by PDB structure ID."""
+    
+    result = tu.tools.BindingDB_get_ligands_by_pdb(
+        pdb_ids=pdb_id,
+        affinity_cutoff=affinity_cutoff,
+        sequence_identity=100
+    )
+    
+    return result
+
+def find_compound_targets(tu, smiles, similarity_cutoff=0.85):
+    """Find other targets for a compound (polypharmacology)."""
+    
+    result = tu.tools.BindingDB_get_targets_by_compound(
+        smiles=smiles,
+        similarity_cutoff=similarity_cutoff
+    )
+    
+    return result
+```
+
+**BindingDB Report Section** (add to Section 9 - Druggability):
+
+```markdown
+### Known Ligands (BindingDB) (NEW)
+
+**Total Ligands with Binding Data**: 156
+**Best Reported Affinity**: 0.3 nM (Ki)
+
+#### Most Potent Ligands
+
+| SMILES | Affinity Type | Value (nM) | Source PMID |
+|--------|---------------|------------|-------------|
+| CC(=O)Nc1ccc(cc1)c2... | Ki | 0.3 | 15737014 |
+| CN(C)C/C=C/C(=O)Nc1... | IC50 | 0.8 | 15896103 |
+| COc1cc2ncnc(Nc3ccc... | Kd | 2.1 | 16460808 |
+
+**Chemical Tractability Assessment**:
+- ✅ **Tchem-level target**: Multiple ligands with <30nM affinity
+- ✅ **Diverse chemotypes**: Multiple scaffolds identified
+- ✅ **Published literature**: Ligands have PMID references
+
+*Source: BindingDB via `BindingDB_get_ligands_by_uniprot`*
+```
+
+**Affinity Interpretation for Druggability**:
+| Affinity Range | Interpretation | Drug Development Potential |
+|----------------|----------------|---------------------------|
+| <1 nM | Ultra-potent | Clinical compound likely |
+| 1-10 nM | Highly potent | Drug-like |
+| 10-100 nM | Potent | Good starting point |
+| 100-1000 nM | Moderate | Needs optimization |
+| >1000 nM | Weak | Early hit only |
+
+### 7.5 PubChem BioAssay - Screening Data (NEW)
+
+PubChem BioAssay provides HTS screening data and dose-response curves:
+
+```python
+def get_pubchem_assays_for_target(tu, gene_symbol):
+    """
+    Get bioassays targeting a gene from PubChem.
+    
+    Provides:
+    - HTS screening results
+    - Dose-response data (IC50/EC50)
+    - Active compound counts
+    """
+    
+    # Search assays by target gene
+    assays = tu.tools.PubChem_search_assays_by_target_gene(
+        gene_symbol=gene_symbol
+    )
+    
+    assay_info = []
+    if assays.get('data', {}).get('aids'):
+        for aid in assays['data']['aids'][:10]:  # Top 10 assays
+            # Get assay details
+            summary = tu.tools.PubChem_get_assay_summary(aid=aid)
+            targets = tu.tools.PubChem_get_assay_targets(aid=aid)
+            
+            assay_info.append({
+                'aid': aid,
+                'summary': summary.get('data', {}),
+                'targets': targets.get('data', {})
+            })
+    
+    return {
+        'total_assays': len(assays.get('data', {}).get('aids', [])),
+        'assay_details': assay_info
+    }
+
+def get_active_compounds_from_assay(tu, aid):
+    """Get active compounds from a specific bioassay."""
+    
+    actives = tu.tools.PubChem_get_assay_active_compounds(aid=aid)
+    
+    return {
+        'aid': aid,
+        'active_cids': actives.get('data', {}).get('cids', []),
+        'count': len(actives.get('data', {}).get('cids', []))
+    }
+```
+
+**PubChem BioAssay Report Section**:
+
+```markdown
+### PubChem BioAssay Data (NEW)
+
+**Assays Targeting This Gene**: 45
+
+| AID | Assay Type | Active Compounds | Target Info |
+|-----|------------|------------------|-------------|
+| 1053104 | Dose-response | 12 | EGFR kinase |
+| 504526 | HTS | 234 | EGFR binding |
+| 651564 | Confirmatory | 8 | EGFR cellular |
+
+**Total Active Compounds Across Assays**: ~500
+
+*Source: PubChem via `PubChem_search_assays_by_target_gene`, `PubChem_get_assay_active_compounds`*
 ```
 
 ---

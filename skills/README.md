@@ -148,7 +148,29 @@ This directory contains specialized skills for retrieving scientific data using 
 
 ---
 
-### 8. DevTU Optimize Skills
+### 8. Documentation Quality Assurance
+**Path**: `devtu-docs-quality/`  
+**Focus**: Comprehensive documentation quality combining automated validation with ToolUniverse-specific auditing  
+**Triggers**: audit docs, optimize docs, review documentation, fix docs, check documentation quality
+
+**Use when**:
+- Pre-release documentation review
+- After major refactoring (commands, APIs, tool counts changed)
+- Users report confusing or outdated documentation
+- Want to establish automated validation pipeline
+- Need to check for circular navigation or structural problems
+
+**Key Features**:
+- Automated validation scripts (commands, links, terminology)
+- ToolUniverse-specific checks (circular navigation, MCP config duplication, tool counts)
+- Auto-generated file header verification
+- CLI and environment variable documentation checks
+- Priority-based issue categorization (Critical → High → Medium → Low)
+- CI/CD integration templates
+
+---
+
+### 9. DevTU Optimize Skills
 **Path**: `devtu-optimize-skills/`  
 **Focus**: Best practices for creating and improving ToolUniverse research skills  
 **Triggers**: optimize skill, improve skill, review skill, skill best practices
@@ -289,6 +311,13 @@ All tools return standardized responses:
 - Finding disease-associated targets
 - Mapping treatment landscape
 - Analyzing disease mechanisms
+
+### Start with devtu-docs-quality if:
+- Reviewing documentation before release
+- After refactoring (commands, APIs changed)
+- Need to validate documentation accuracy
+- Want automated validation pipeline
+- Users report confusing or circular documentation
 
 ### Start with devtu-optimize-skills if:
 - Creating a new ToolUniverse skill

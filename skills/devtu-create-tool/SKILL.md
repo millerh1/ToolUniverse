@@ -23,13 +23,14 @@ Create new scientific tools for the ToolUniverse framework following established
 
 ## Critical Knowledge
 
-### Top 5 Mistakes (90% of Failures)
+### Top 6 Mistakes (90% of Failures)
 
 1. **Missing `default_config.py` Entry** - Tools silently won't load
 2. **Fake test_examples** - Tests fail, agents get bad examples
 3. **Single-level Testing** - Misses registration bugs
-4. **Tool Names > 55 chars** - Breaks MCP compatibility
-5. **Raising Exceptions** - Should return error dicts instead
+4. **Skipping `test_new_tools.py`** - Misses schema/API issues
+5. **Tool Names > 55 chars** - Breaks MCP compatibility
+6. **Raising Exceptions** - Should return error dicts instead
 
 ### Tool Creator vs SDK User
 
@@ -311,6 +312,54 @@ def _submit_job(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "error": str(e)}
 ```
 
+### API Key Configuration
+
+Tools can specify API key requirements in JSON config:
+
+**`required_api_keys`** - Tool won't load without these:
+```json
+{
+  "name": "NVIDIA_ESMFold_predict",
+  "required_api_keys": ["NVIDIA_API_KEY"],
+  ...
+}
+```
+
+**`optional_api_keys`** - Tool loads and works without keys, but with reduced performance:
+```json
+{
+  "name": "PubMed_search_articles",
+  "optional_api_keys": ["NCBI_API_KEY"],
+  "description": "Search PubMed. Rate limits: 3 req/sec without key, 10 req/sec with NCBI_API_KEY.",
+  ...
+}
+```
+
+**When to use `optional_api_keys`**:
+- APIs with rate limits that improve with a key (NCBI: 3→10 req/sec, Semantic Scholar: 1→100 req/sec)
+- APIs that work anonymously but have better quotas with authentication
+- Tools that should always be available, even for users without API keys
+
+**Implementation pattern for optional keys**:
+```python
+def __init__(self, tool_config):
+    super().__init__(tool_config)
+    # Read from environment variable only (not as parameter)
+    self.api_key = os.environ.get("NCBI_API_KEY", "")
+
+def run(self, arguments):
+    # Adjust behavior based on key availability
+    has_key = bool(self.api_key)
+    rate_limit = 0.1 if has_key else 0.4  # Faster with key
+    ...
+```
+
+**Key rules**:
+- ❌ Don't add `api_key` as a tool parameter for optional keys
+- ✅ Read optional keys from environment variables only
+- ✅ Include rate limit info in tool description
+- ✅ Tool must work (with degraded performance) when key is missing
+
 ### JSON Best Practices
 
 **Tool Naming** (≤55 chars for MCP):
@@ -346,6 +395,41 @@ Include: What it returns, data source, use case, input format, example
 ---
 
 ## Testing Strategy
+
+### Final Validation with test_new_tools.py (MANDATORY)
+
+**All new tools MUST pass `scripts/test_new_tools.py` before submission.**
+
+This script tests tools using their `test_examples` from JSON configs and validates responses against `return_schema`.
+
+```bash
+# Test your specific tools
+python scripts/test_new_tools.py your_tool_name
+
+# Test with verbose output
+python scripts/test_new_tools.py your_tool_name -v
+
+# Test all tools (for full validation)
+python scripts/test_new_tools.py
+
+# Stop on first failure
+python scripts/test_new_tools.py your_tool_name --fail-fast
+```
+
+**What it validates**:
+- Tool execution succeeds (no exceptions)
+- Response matches `return_schema` (if defined)
+- 404 errors tracked separately (indicates bad test_examples)
+- Tools with missing API keys are skipped gracefully
+
+**Common failures and fixes**:
+| Failure | Cause | Fix |
+|---------|-------|-----|
+| 404 ERROR | Invalid ID in test_examples | Use real IDs from API docs |
+| Schema Mismatch | Response doesn't match return_schema | Update schema or fix response format |
+| Exception | Code bug or missing dependency | Check error message, fix implementation |
+
+---
 
 ### Two-Level Testing (MANDATORY)
 
@@ -538,9 +622,10 @@ python3 -c "from tooluniverse import ToolUniverse; tu = ToolUniverse(); tu.load_
 5. **Test** Level 1 (direct class)
 6. **Test** Level 2 (ToolUniverse interface)
 7. **Test** Level 3 (real API calls)
-8. **Create** examples file
-9. **Verify** all 3 registration steps
-10. **Document** in verification report
+8. **Run** `python scripts/test_new_tools.py your_tool -v` ← MANDATORY
+9. **Create** examples file
+10. **Verify** all 3 registration steps
+11. **Document** in verification report
 
 ### Quick Commands
 
@@ -560,8 +645,11 @@ PYTHONPATH=src python3 -m tooluniverse.generate_tools --force
 # List wrappers
 ls src/tooluniverse/tools/YourCategory_*.py
 
-# Run tests
+# Run unit tests
 pytest tests/unit/test_your_tool.py -v
+
+# MANDATORY: Run test_new_tools.py validation
+python scripts/test_new_tools.py your_tool -v
 
 # Count tools
 python3 << 'EOF'
@@ -578,10 +666,13 @@ EOF
 ⚠️ **NEVER** raise exceptions in run()
 ⚠️ **ALWAYS** use real test_examples
 ⚠️ **ALWAYS** test both levels
+⚠️ **RUN** `python scripts/test_new_tools.py your_tool -v` before submitting
 ⚠️ **KEEP** tool names ≤55 characters
 ⚠️ **RETURN** standard response format
 ⚠️ **SET** timeout on all HTTP requests
 ⚠️ **VERIFY** all 3 registration steps
+⚠️ **USE** `optional_api_keys` for rate-limited APIs that work without keys
+⚠️ **NEVER** add `api_key` parameter for optional keys - use env vars only
 
 ### Success Criteria
 
@@ -589,6 +680,7 @@ EOF
 ✅ Level 1 tests passing (direct class)
 ✅ Level 2 tests passing (ToolUniverse interface)
 ✅ Real API calls working (Level 3)
+✅ **`test_new_tools.py` passes with 0 failures** ← MANDATORY
 ✅ Tool names ≤55 characters
 ✅ test_examples use real IDs
 ✅ Standard response format used

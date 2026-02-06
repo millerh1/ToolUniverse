@@ -74,6 +74,11 @@ class TestDisGeNETToolInterface:
 
     def test_tools_registered(self, tu):
         """Test that DisGeNET tools are registered."""
+        # DisGeNET tools require API key - skip if not loaded
+        import os
+        if not os.environ.get("DISGENET_API_KEY"):
+            pytest.skip("DISGENET_API_KEY not set")
+        
         assert hasattr(tu.tools, "DisGeNET_search_gene")
         assert hasattr(tu.tools, "DisGeNET_search_disease")
         assert hasattr(tu.tools, "DisGeNET_get_gda")

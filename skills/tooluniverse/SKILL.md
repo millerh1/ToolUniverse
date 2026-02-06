@@ -19,6 +19,39 @@ Master strategies for using ToolUniverse's 10000+ scientific tools effectively. 
 
 ---
 
+## Step 0: Clarify the Request Before Researching
+
+**CRITICAL**: Before starting any research, ensure you understand what the user actually needs. Wasted tool calls on the wrong entity or scope are expensive.
+
+### When to Ask Clarifying Questions
+
+| Signal | Example | What to Clarify |
+|--------|---------|-----------------|
+| **Vague entity** | "Research cancer" | Which cancer type? Which aspect (treatment, genetics, epidemiology)? |
+| **Ambiguous name** | "Tell me about JAK" | JAK1/2/3? The gene family? A specific inhibitor? |
+| **Unclear scope** | "Look into metformin" | Drug profile? Repurposing? Safety? Mechanism? |
+| **Missing context** | "What targets this?" | Which compound/disease/pathway? |
+| **Multiple interpretations** | "ACE" | ACE the gene? ACE inhibitors? ACE2? |
+
+### When NOT to Ask
+
+Proceed directly when the request is specific enough:
+- "What is the structure of EGFR kinase domain?" - Clear entity + clear data type
+- "Find all drugs targeting BRAF V600E" - Specific variant + clear task
+- "Research Alzheimer's disease comprehensively" - Broad but unambiguous
+
+### Clarification Checklist
+
+Before starting research, confirm you know:
+1. **Entity** - Exactly which gene/protein/drug/disease?
+2. **Species** - Human unless stated otherwise
+3. **Scope** - Comprehensive profile or specific aspect?
+4. **Output** - Report, data table, quick answer, or comparison?
+
+If any of these are unclear, ask the user **one concise question** covering all ambiguities rather than asking multiple rounds of questions.
+
+---
+
 ## Strategy 1: Exhaustive Tool Discovery
 
 **CRITICAL**: ToolUniverse has 10000+ tools. Before any research task, search for ALL relevant tools.
@@ -336,14 +369,30 @@ No pathogen interactions identified in literature or databases.
 
 | Task | Recommended Skill |
 |------|-------------------|
-| **Drug profiling** | `tooluniverse-drug-research` |
-| **Target analysis** | `tooluniverse-target-research` |
-| **Disease research** | `tooluniverse-disease-research` |
-| **Literature review** | `tooluniverse-literature-deep-research` |
-| **Protein structure** | `tooluniverse-protein-structure-retrieval` |
-| **Sequence retrieval** | `tooluniverse-sequence-retrieval` |
-| **Chemical compounds** | `tooluniverse-chemical-compound-retrieval` |
-| **Expression data** | `tooluniverse-expression-data-retrieval` |
+| **Data Retrieval** | |
+| Chemical compounds | `tooluniverse-chemical-compound-retrieval` |
+| Expression data | `tooluniverse-expression-data-retrieval` |
+| Protein structure | `tooluniverse-protein-structure-retrieval` |
+| Sequence retrieval | `tooluniverse-sequence-retrieval` |
+| **Research & Profiling** | |
+| Disease research | `tooluniverse-disease-research` |
+| Drug profiling | `tooluniverse-drug-research` |
+| Literature review | `tooluniverse-literature-deep-research` |
+| Target analysis | `tooluniverse-target-research` |
+| **Clinical Decision Support** | |
+| Drug safety analysis | `tooluniverse-pharmacovigilance` |
+| Precision oncology treatment | `tooluniverse-precision-oncology` |
+| Rare disease diagnosis | `tooluniverse-rare-disease-diagnosis` |
+| Variant interpretation | `tooluniverse-variant-interpretation` |
+| **Discovery & Design** | |
+| Small molecule binder discovery | `tooluniverse-binder-discovery` |
+| Drug repurposing | `drug-repurposing` |
+| Protein therapeutic design | `tooluniverse-protein-therapeutic-design` |
+| **Outbreak Response** | |
+| Infectious disease analysis | `tooluniverse-infectious-disease` |
+| **Infrastructure & Development** | |
+| ToolUniverse installation/setup | `setup-tooluniverse` |
+| Python SDK for AI scientist systems | `tooluniverse-sdk` |
 
 ### When to Use This General Skill
 
@@ -512,6 +561,7 @@ ClinicalTrials.gov, FAERS, PharmGKB, DailyMed tools
 
 | Principle | Action |
 |-----------|--------|
+| **Clarify first** | Confirm entity, scope, species, and output before researching |
 | **Search widely** | 10000+ tools; always discover more |
 | **Multi-hop persistence** | 5-10 tool calls per question is normal |
 | **Cross-reference** | Query multiple databases for same data |

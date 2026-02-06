@@ -14,7 +14,7 @@ class TestBindingDBToolDirect:
     def tool_config(self):
         with open("src/tooluniverse/data/bindingdb_tools.json") as f:
             tools = json.load(f)
-            return next(t for t in tools if t["name"] == "BindingDB_get_by_uniprot")
+            return next(t for t in tools if t["name"] == "BindingDB_get_ligands_by_uniprot")
 
     @pytest.fixture
     def tool(self, tool_config):
@@ -22,9 +22,9 @@ class TestBindingDBToolDirect:
         return BindingDBTool(tool_config)
 
     def test_missing_uniprot_id(self, tool):
-        result = tool.run({"operation": "get_by_uniprot"})
+        result = tool.run({"operation": "get_ligands_by_uniprot"})
         assert result["status"] == "error"
-        assert "uniprot_id" in result["error"].lower()
+        assert "uniprot" in result["error"].lower()
 
     def test_unknown_operation(self, tool):
         result = tool.run({"operation": "unknown"})
@@ -33,15 +33,21 @@ class TestBindingDBToolDirect:
     @patch("tooluniverse.bindingdb_tool.requests.get")
     def test_get_by_uniprot_success(self, mock_get, tool):
         mock_response = MagicMock()
-        mock_response.json.return_value = [
-            {"monomerid": "12345", "smiles": "CCO", "affinity_type": "IC50", "affinity_value": 100}
-        ]
+        mock_response.json.return_value = {
+            "getLigandsByUniprotResponse": {
+                "affinities": [
+                    {"query": "P00533", "monomerid": "12345", "smile": "CCO", "affinity_type": "IC50", "affinity": "100", "pmid": None, "doi": None}
+                ]
+            }
+        }
         mock_response.headers = {"Content-Type": "application/json"}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        result = tool.run({"operation": "get_by_uniprot", "uniprot_id": "P00533"})
+        result = tool.run({"operation": "get_ligands_by_uniprot", "uniprot": "P00533"})
         assert result["status"] == "success"
+        assert "data" in result
+        assert len(result["data"]) > 0
 
 
 class TestBindingDBToolInterface:
@@ -55,6 +61,7 @@ class TestBindingDBToolInterface:
         return tu
 
     def test_tools_registered(self, tu):
-        assert hasattr(tu.tools, "BindingDB_get_by_uniprot")
-        assert hasattr(tu.tools, "BindingDB_get_by_pdb")
-        assert hasattr(tu.tools, "BindingDB_get_by_target_name")
+        assert hasattr(tu.tools, "BindingDB_get_ligands_by_uniprot")
+        assert hasattr(tu.tools, "BindingDB_get_ligands_by_uniprots")
+        assert hasattr(tu.tools, "BindingDB_get_ligands_by_pdb")
+        assert hasattr(tu.tools, "BindingDB_get_targets_by_compound")

@@ -27,5 +27,10 @@ class TestBRENDAToolInterface:
         return tu
 
     def test_tools_registered(self, tu):
+        # BRENDA tools require API keys - skip if not loaded
+        import os
+        if not (os.environ.get("BRENDA_EMAIL") and os.environ.get("BRENDA_PASSWORD")):
+            pytest.skip("BRENDA_EMAIL and BRENDA_PASSWORD not set")
+        
         assert hasattr(tu.tools, "BRENDA_get_km")
         assert hasattr(tu.tools, "BRENDA_get_kcat")
