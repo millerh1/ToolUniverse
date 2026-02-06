@@ -539,8 +539,7 @@ Here's what different log levels look like in practice:
 Now that you understand ToolUniverse logging:
 
 * **🔬 Workflows** → :doc:`scientific_workflows` - Apply logging to scientific workflows
-* **⚡ Best Practices** → :doc:`best_practices` - Production-ready logging strategies
-* **🛠️ Custom Tools** → :doc:`../tutorials/custom_tools` - Add logging to your custom tools
+* **🔧 Extend Tools** → :doc:`../expand_tooluniverse/index` - Add logging to custom tools
 * **❓ Troubleshooting** → :doc:`../help/troubleshooting` - Debug common logging issues
 
 .. tip::

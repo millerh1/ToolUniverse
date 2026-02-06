@@ -72,7 +72,7 @@ ToolUniverse supports these AI providers:
    - Run models on your own infrastructure
    - Models: Any model supported by vLLM (Llama, Mistral, Qwen, etc.)
    - Configuration: Set ``VLLM_SERVER_URL``
-   - See :doc:`../guide/vllm_support` for complete setup guide
+   - See :doc:`../guide/openrouter_support` for LLM provider configuration
 
 
 Step 3: Create Your First Tool
@@ -192,7 +192,7 @@ Set up AI model settings:
 - ``temperature``: 0.0-2.0 (higher = more creative)
 - ``return_json``: true for structured data, false for text
 
-**Using vLLM**: Set ``api_type: "VLLM"`` and ensure ``VLLM_SERVER_URL`` is set. See :doc:`../guide/vllm_support` for complete setup instructions.
+**Using vLLM**: Set ``api_type: "VLLM"`` and ensure ``VLLM_SERVER_URL`` is set. See :doc:`../guide/vllm_support` for complete setup guide.
 
 3.7 Complete Tool Example
 -------------------------

@@ -332,4 +332,4 @@ The Tool Caller is ToolUniverse's execution engine that provides:
         "arguments": {"accession": "P05067"}
     })
 
-For more information, see the :doc:`api_comprehensive` documentation.
+For more information, see the :doc:`../api/modules` documentation.

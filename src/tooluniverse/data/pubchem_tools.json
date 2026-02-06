@@ -571,5 +571,282 @@
         }
       }
     }
+  },
+  {
+    "name": "PubChem_get_assay_description",
+    "description": "Get bioassay description and metadata by AID. Returns assay name, source, protocol, target information, activity outcomes, and data columns. Essential for understanding what an assay measures before retrieving results.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "aid": {
+          "type": "integer",
+          "description": "PubChem BioAssay ID (e.g., 1000, 504526)"
+        }
+      },
+      "required": ["aid"]
+    },
+    "fields": {
+      "endpoint": "/assay/aid/{aid}/description/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"aid": 1000},
+      {"aid": 504526}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "PC_AssayContainer": {"type": "array"}
+      }
+    }
+  },
+  {
+    "name": "PubChem_get_assay_summary",
+    "description": "Get summary statistics for a bioassay by AID. Returns counts of active/inactive compounds, target information, and assay metadata. Useful for quick assessment of assay size and hit rate.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "aid": {
+          "type": "integer",
+          "description": "PubChem BioAssay ID"
+        }
+      },
+      "required": ["aid"]
+    },
+    "fields": {
+      "endpoint": "/assay/aid/{aid}/summary/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"aid": 1000}
+    ],
+    "return_schema": {
+      "type": "object"
+    }
+  },
+  {
+    "name": "PubChem_get_assay_targets",
+    "description": "Get protein/gene targets for a bioassay. Returns GI numbers, protein names, gene IDs, and gene symbols. Critical for understanding what molecular targets an assay screens against.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "aid": {
+          "type": "integer",
+          "description": "PubChem BioAssay ID"
+        }
+      },
+      "required": ["aid"]
+    },
+    "fields": {
+      "endpoint": "/assay/aid/{aid}/targets/ProteinGI,ProteinName,GeneID,GeneSymbol/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"aid": 1000}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "InformationList": {
+          "type": "object",
+          "properties": {
+            "Information": {"type": "array"}
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PubChem_search_assays_by_target_gene",
+    "description": "Search bioassays by target gene symbol. Returns AIDs of assays that screen against the specified gene. Example: USP2 returns assays targeting USP2 protease.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_symbol": {
+          "type": "string",
+          "description": "Gene symbol to search (e.g., EGFR, USP2, TP53)"
+        }
+      },
+      "required": ["gene_symbol"]
+    },
+    "fields": {
+      "endpoint": "/assay/target/genesymbol/{gene_symbol}/aids/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"gene_symbol": "USP2"},
+      {"gene_symbol": "EGFR"}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "IdentifierList": {
+          "type": "object",
+          "properties": {
+            "AID": {"type": "array", "items": {"type": "integer"}}
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PubChem_search_assays_by_type",
+    "description": "Search bioassays by assay type. Types: screening (HTS), confirmatory, doseresponse, summary, cellbased, biochemical, invivo, invitro. Returns list of matching AIDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "assay_type": {
+          "type": "string",
+          "enum": ["screening", "confirmatory", "doseresponse", "summary", "cellbased", "biochemical", "invivo", "invitro"],
+          "description": "Type of assay to search for"
+        }
+      },
+      "required": ["assay_type"]
+    },
+    "fields": {
+      "endpoint": "/assay/type/{assay_type}/aids/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"assay_type": "doseresponse"}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "IdentifierList": {
+          "type": "object",
+          "properties": {
+            "AID": {"type": "array", "items": {"type": "integer"}}
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PubChem_get_compound_bioactivity",
+    "description": "Get bioassay results summary for a compound by CID. Returns all assays the compound was tested in, activity outcomes (active/inactive), and target information. Critical for understanding compound's biological profile.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "cid": {
+          "type": "integer",
+          "description": "PubChem Compound ID"
+        }
+      },
+      "required": ["cid"]
+    },
+    "fields": {
+      "endpoint": "/compound/cid/{cid}/assaysummary/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"cid": 2244},
+      {"cid": 5090}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "Table": {"type": "object"}
+      }
+    }
+  },
+  {
+    "name": "PubChem_get_assay_active_compounds",
+    "description": "Get CIDs of compounds that are ACTIVE in a bioassay. Returns compound IDs that passed the activity threshold. Use for hit identification from HTS screens.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "aid": {
+          "type": "integer",
+          "description": "PubChem BioAssay ID"
+        }
+      },
+      "required": ["aid"]
+    },
+    "fields": {
+      "endpoint": "/assay/aid/{aid}/cids/JSON?cids_type=active",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"aid": 1000},
+      {"aid": 504526}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "InformationList": {
+          "type": "object",
+          "properties": {
+            "Information": {"type": "array"}
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PubChem_get_assay_dose_response",
+    "description": "Get dose-response data from a bioassay. Returns concentration-response curves for tested compounds. Essential for determining IC50/EC50 values. Limited to dose-response type assays.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "aid": {
+          "type": "integer",
+          "description": "PubChem BioAssay ID (must be a dose-response assay)"
+        }
+      },
+      "required": ["aid"]
+    },
+    "fields": {
+      "endpoint": "/assay/aid/{aid}/doseresponse/JSON",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"aid": 504526}
+    ],
+    "return_schema": {
+      "type": "object"
+    }
+  },
+  {
+    "name": "PubChem_get_assays_for_compound_active",
+    "description": "Get AIDs of assays where a compound is ACTIVE. Returns list of bioassay IDs where the compound showed activity. Use to understand a compound's target profile.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "cid": {
+          "type": "integer",
+          "description": "PubChem Compound ID"
+        }
+      },
+      "required": ["cid"]
+    },
+    "fields": {
+      "endpoint": "/compound/cid/{cid}/aids/JSON?aids_type=active",
+      "use_pugview": false
+    },
+    "type": "PubChemRESTTool",
+    "test_examples": [
+      {"cid": 2244},
+      {"cid": 5090}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "IdentifierList": {
+          "type": "object",
+          "properties": {
+            "AID": {"type": "array", "items": {"type": "integer"}}
+          }
+        }
+      }
+    }
   }
 ]

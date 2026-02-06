@@ -11,7 +11,7 @@ Python API: Using load_tools()
 The ``load_tools()`` method is the primary way to load tools when using ToolUniverse programmatically in Python.
 
 .. note::
-   **For complete Python API documentation**, see :doc:`api_quick_reference` for commonly used classes and methods, or :doc:`api_comprehensive` for full API reference.
+   **For complete Python API documentation**, see :doc:`../api/modules` for the full API reference.
 
 .. autofunction:: tooluniverse.execute_function.ToolUniverse.load_tools
    :noindex:

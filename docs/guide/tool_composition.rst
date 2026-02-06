@@ -587,10 +587,9 @@ The Tool Caller interface abstracts tool invocation, enabling developers to focu
 Next Steps
 ----------
 
-- **Learn Components**: :doc:`architecture` - Understand ToolUniverse architecture
+- **Learn Components**: :doc:`../expand_tooluniverse/architecture` - Understand ToolUniverse architecture
 - **Build AI Scientists**: :doc:`building_ai_scientists/index` - Create autonomous research workflows
 - **Case Studies**: :doc:`scientific_workflows` - Real composition examples
-- **Best Practices**: :doc:`best_practices` - Production workflow optimization
 
 .. tip::
    **Start simple**: Begin with sequential workflows like the LiteratureSearchTool example, then progress to more complex patterns as you become comfortable with tool composition.

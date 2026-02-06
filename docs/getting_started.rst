@@ -335,7 +335,7 @@ Tools
 ~~~~~~~~~~~~~~~~~~~
 
 * **API Modules** → :doc:`api/modules` - Complete API reference documentation
-* **Reference Index** → :doc:`reference/index` - Reference documentation and specifications
+* **CLI Tools Reference** → :doc:`reference/cli_tools` - Command-line tools documentation
 * **Help & Support** → :doc:`help/index` - Help resources and troubleshooting guides
 
 .. seealso::

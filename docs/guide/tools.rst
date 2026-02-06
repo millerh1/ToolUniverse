@@ -973,8 +973,7 @@ Now that you know what tools are available:
 
 * 🚀 **Try Examples**: :doc:`examples` - See tools in action
 * 🔬 **Build Workflows**: :doc:`scientific_workflows` - Combine tools for research
-* ⚡ **Optimize**: :doc:`best_practices` - Performance and production tips
-* 🛠️ **Create Custom**: :doc:`../tutorials/custom_tools` - Build your own tools
+* 🔧 **Extend ToolUniverse**: :doc:`../expand_tooluniverse/index` - Create custom tools
 
 .. tip::
    **Discovery tip**: Use the AI-powered tool discovery features to find the right tools for your specific research questions!

@@ -66,7 +66,7 @@ ImportError: No module named 'tooluniverse'
 
       .. code-block:: bash
 
-         git clone https://github.com/zitniklab/tooluniverse
+         git clone https://github.com/mims-harvard/ToolUniverse
          cd tooluniverse
          pip install -e .
 
@@ -629,7 +629,7 @@ Getting Help
 If none of these solutions work:
 
 1. **Check the FAQ**: :doc:`faq`
-2. **Search GitHub issues**: `Issues <https://github.com/zitniklab/tooluniverse/issues>`_
+2. **Search GitHub issues**: `Issues <https://github.com/mims-harvard/ToolUniverse/issues>`_
 3. **Create a bug report** with:
 
    - ToolUniverse version: ``tooluniverse.__version__``

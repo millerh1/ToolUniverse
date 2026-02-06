@@ -217,5 +217,216 @@
       {"keyword": "BRCA2"},
       {"keyword": "TP53"}
     ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_cancer_types",
+    "description": "Get all cancer types from cBioPortal including TCGA, Pan-Cancer Atlas, and other studies. Returns cancerTypeId, name, and clinical trial keywords for filtering studies.",
+    "parameter": {
+      "type": "object",
+      "properties": {}
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/cancer-types",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cancerTypeId": {"type": "string"},
+          "name": {"type": "string"},
+          "dedicatedColor": {"type": "string"},
+          "shortName": {"type": "string"},
+          "parent": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_panels",
+    "description": "Get all gene panels used in cBioPortal studies. Gene panels define which genes were sequenced in a study. Use to understand coverage before querying mutation data.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "page_size": {"type": "integer", "default": 50, "description": "Number of panels to return"}
+      }
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/gene-panels?pageSize={page_size}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "genePanelId": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"page_size": 10}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_panel_genes",
+    "description": "Get all genes in a specific gene panel. Essential for understanding what genes are covered when analyzing mutation frequency data from targeted sequencing studies.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_panel_id": {"type": "string", "description": "Gene panel ID (e.g., 'IMPACT468')"}
+      },
+      "required": ["gene_panel_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/gene-panels/{gene_panel_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "genePanelId": {"type": "string"},
+        "description": {"type": "string"},
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entrezGeneId": {"type": "integer"},
+              "hugoGeneSymbol": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [{"gene_panel_id": "IMPACT468"}, {"gene_panel_id": "IMPACT341"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_clinical_attributes",
+    "description": "Get available clinical attributes for a cancer study. Returns attribute IDs, names, and data types. Use to know what clinical data can be queried (e.g., stage, grade, survival).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID (e.g., 'brca_tcga')"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/clinical-attributes",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "clinicalAttributeId": {"type": "string"},
+          "displayName": {"type": "string"},
+          "description": {"type": "string"},
+          "datatype": {"type": "string"},
+          "patientAttribute": {"type": "boolean"},
+          "priority": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"study_id": "brca_tcga"}, {"study_id": "luad_tcga"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_clinical_data",
+    "description": "Get clinical data for all samples in a study. Returns patient-level data like tumor stage, histology, survival status. Filter by clinical attribute ID for specific data types.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"},
+        "clinical_attribute_id": {"type": "string", "description": "Optional clinical attribute ID to filter by"},
+        "page_size": {"type": "integer", "default": 100, "description": "Number of records to return"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/clinical-data?pageSize={page_size}&clinicalDataType=SAMPLE",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "clinicalAttributeId": {"type": "string"},
+          "value": {"type": "string"},
+          "sampleId": {"type": "string"},
+          "patientId": {"type": "string"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga", "page_size": 50},
+      {"study_id": "luad_tcga", "page_size": 50}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_sample_lists",
+    "description": "Get all sample lists (cohort definitions) in a cancer study. Sample lists define groups like 'samples with mutations', 'samples with CNA data'. Use for targeted queries.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/sample-lists",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sampleListId": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "category": {"type": "string"},
+          "sampleCount": {"type": "integer"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"study_id": "brca_tcga"}, {"study_id": "luad_tcga"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_info",
+    "description": "Get detailed information about a specific gene by Entrez Gene ID. Returns gene symbol, aliases, type, and chromosome location.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entrez_gene_id": {"type": "integer", "description": "Entrez Gene ID (e.g., 672 for BRCA1)"}
+      },
+      "required": ["entrez_gene_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/genes/{entrez_gene_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "entrezGeneId": {"type": "integer"},
+        "hugoGeneSymbol": {"type": "string"},
+        "type": {"type": "string"},
+        "cytoband": {"type": "string"},
+        "length": {"type": "integer"}
+      }
+    },
+    "test_examples": [{"entrez_gene_id": 672}, {"entrez_gene_id": 7157}]
   }
 ]

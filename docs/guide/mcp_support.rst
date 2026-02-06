@@ -102,7 +102,7 @@ The following are commonly used command-line flags for ToolUniverse MCP servers.
 
    tooluniverse-smcp [OPTIONS]
 
-   --port INT                     Server port (HTTP/SSE). Default: 7000
+   --port INT                     Server port (HTTP/SSE). Default: 8000
    --host TEXT                    Bind host for HTTP/SSE. Default: 0.0.0.0
    --transport [http|stdio|sse]   Transport protocol. Default: http
    --name TEXT                    Server display name
@@ -441,9 +441,7 @@ Core MCP Components
 - :doc:`tool_caller` - Tool execution engine and MCP server implementation
 - :doc:`loading_tools` - Tool loading and MCP server configuration
 - :doc:`interaction_protocol` - ToolUniverse interaction protocol and MCP schema
-- :doc:`../api/tooluniverse.smcp` - SMCP server API documentation
-- :doc:`../api/tooluniverse.mcp_integration` - MCP integration module API
-- :doc:`../api/tooluniverse.mcp_tool_registry` - MCP tool registry API
+- :doc:`../api/modules` - Complete API documentation
 
 AI Scientist Integration
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -485,14 +483,12 @@ Examples and Tutorials
 ~~~~~~~~~~~~~~~~~~~~~~
 
 - :doc:`examples` - Practical MCP usage examples
-- :doc:`../tutorials/index` - Comprehensive tutorials for MCP integration
+- :doc:`building_ai_scientists/index` - Comprehensive tutorials for MCP integration with AI systems
 
 API Reference
 ~~~~~~~~~~~~~
 
-- :doc:`api_comprehensive` - Complete SMCP API documentation
-- :doc:`api_quick_reference` - Quick reference for common MCP operations
-- :doc:`../api/tooluniverse.mcp_client_tool` - MCP client tool API
+- :doc:`../api/modules` - Complete API documentation
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

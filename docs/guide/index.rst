@@ -6,7 +6,7 @@ This comprehensive tutorial takes you from basic concepts to advanced AI scienti
 
 Choose the section that matches your current needs:
 
-💡 **For Python API documentation**, see the dedicated :doc:`../api/index` section.
+💡 **For Python API documentation**, see the dedicated :doc:`../api/modules` section.
 
 💡 **For MCP integration and server setup**, see the comprehensive :doc:`mcp_support` guide.
 

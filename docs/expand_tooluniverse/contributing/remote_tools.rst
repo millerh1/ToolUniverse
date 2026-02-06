@@ -512,9 +512,9 @@ Next Steps
 After successfully contributing your remote tool:
 
 * 🏠 **Local Tools**: :doc:`local_tools` - Learn about contributing local tools
-* 📚 **MCP Server Development**: :doc:`../remote_tools/mcp_server` - Advanced MCP server patterns
+* 📚 **MCP Integration**: :doc:`../remote_tools/mcp_integration` - MCP integration patterns
 * 🔍 **Architecture**: :doc:`../reference/architecture` - Understand ToolUniverse internals
-* 📊 **Comparison**: Review the tool type comparison table in :doc:`../contributing/index`
+* 📊 **Comparison**: Review the tool type comparison table in :doc:`index`
 
 .. tip::
    **Success Tips**: Start with simple servers, test thoroughly with real deployments, and provide clear documentation for users to run your service!

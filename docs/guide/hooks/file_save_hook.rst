@@ -254,5 +254,4 @@ Next Steps
 **Related Topics**
 
 - **Tool Composition** → :doc:`../tool_composition` - Chain tools into workflows
-- **Best Practices** → :doc:`../best_practices` - Performance optimization tips
 - **Examples** → :doc:`../examples` - More usage examples

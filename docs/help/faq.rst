@@ -74,7 +74,7 @@ How do I install ToolUniverse?
 
       .. code-block:: bash
 
-         git clone https://github.com/zitniklab/tooluniverse
+         git clone https://github.com/mims-harvard/ToolUniverse
          cd tooluniverse
          pip install -e .
 
@@ -87,19 +87,15 @@ How do I install ToolUniverse?
 Do I need API keys?
 ~~~~~~~~~~~~~~~~~~~
 
-Some tools require API keys for accessing external services:
+Most tools work without API keys! However, some tools require authentication or provide higher rate limits with API keys.
 
-**Required API Keys:**
-- OpenTargets Platform API key (free registration)
-- NCBI E-utilities API key (optional but recommended)
+**Quick answer:**
 
-**How to set API keys:**
+- **No API keys needed** for most tools (PubMed, UniProt, ChEMBL, OpenTargets, etc.)
+- **Recommended for better performance**: NCBI, FDA (3-10x faster rate limits)
+- **Required for specific features**: NVIDIA NIM (structure prediction), USPTO (patents), DisGeNET, OMIM
 
-.. code-block:: python
-
-   import os
-   os.environ['OPENTARGETS_API_KEY'] = 'your_api_key_here'
-   os.environ['NCBI_API_KEY'] = 'your_ncbi_key_here'
+**For complete details**, see :doc:`../api_keys` which covers all API keys, how to obtain them, rate limits, and configuration methods.
 
 Common Issues
 -------------
@@ -179,8 +175,8 @@ How do I use ToolUniverse with Claude?
       {
         "mcpServers": {
           "tooluniverse": {
-            "command": "python",
-            "args": ["-m", "tooluniverse.smcp_server"]
+            "command": "tooluniverse-smcp-stdio",
+            "args": ["--compact-mode"]
           }
         }
       }
@@ -199,12 +195,12 @@ Yes! You can run multiple ToolUniverse instances or combine with other MCP serve
    {
      "mcpServers": {
        "tooluniverse-main": {
-         "command": "python",
-         "args": ["-m", "tooluniverse.smcp_server", "--port", "3000"]
+         "command": "tooluniverse-smcp",
+         "args": ["--port", "3000", "--compact-mode"]
        },
        "tooluniverse-dev": {
-         "command": "python",
-         "args": ["-m", "tooluniverse.smcp_server", "--port", "3001", "--config", "dev"]
+         "command": "tooluniverse-smcp",
+         "args": ["--port", "3001", "--compact-mode", "--load", "community/dev-tools"]
        }
      }
    }
@@ -370,8 +366,8 @@ Still Having Issues?
 
 If you can't find the answer here:
 
-1. **Check the documentation**: :doc:`user_guide/index`
-2. **Search existing issues**: `GitHub Issues <https://github.com/zitniklab/tooluniverse/issues>`_
+1. **Check the documentation**: :doc:`../guide/index`
+2. **Search existing issues**: `GitHub Issues <https://github.com/mims-harvard/ToolUniverse/issues>`_
 3. **Ask the community**: Join our Discord server
 4. **Report a bug**: Create a new GitHub issue with details
 

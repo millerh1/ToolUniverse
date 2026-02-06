@@ -10,6 +10,7 @@ API Documentation:
 """
 
 import requests
+import urllib.parse
 from typing import Dict, Any, Optional, List
 from .base_tool import BaseTool
 from .tool_registry import register_tool
@@ -17,6 +18,23 @@ from .tool_registry import register_tool
 # Base URLs for Orphanet APIs
 ORPHADATA_API_URL = "https://api.orphadata.com"
 RDCODE_API_URL = "https://api.orphacode.org"
+
+# RDcode API requires apiKey header (any value accepted)
+RDCODE_API_KEY = "ToolUniverse"
+
+
+def get_rdcode_headers():
+    """Get headers for RDcode API requests."""
+    return {
+        "Accept": "application/json",
+        "User-Agent": "ToolUniverse/Orphanet",
+        "apiKey": RDCODE_API_KEY,
+    }
+
+
+def normalize_lang(lang: str) -> str:
+    """Convert language code to uppercase as required by RDcode API."""
+    return lang.upper() if lang else "EN"
 
 
 @register_tool("OrphanetTool")
@@ -30,7 +48,8 @@ class OrphanetTool(BaseTool):
     - Epidemiology data (prevalence, inheritance)
     - Expert centers and patient organizations
 
-    No authentication required. Free public access.
+    RDcode API requires apiKey header (any value accepted).
+    Orphadata API is free public access.
     """
 
     def __init__(self, tool_config: Dict[str, Any]):
@@ -71,28 +90,32 @@ class OrphanetTool(BaseTool):
         if not query:
             return {"status": "error", "error": "Missing required parameter: query"}
 
-        lang = arguments.get("lang", "en")
+        lang = normalize_lang(arguments.get("lang", "en"))
 
         try:
-            # Use RDcode API for searching
+            # Use RDcode API for approximate name search
+            # URL pattern: /{lang}/ClinicalEntity/ApproximateName/{label}
+            encoded_query = urllib.parse.quote(query, safe="")
             response = requests.get(
-                f"{RDCODE_API_URL}/rd-nomenclature/search",
-                params={"query": query, "lang": lang},
+                f"{RDCODE_API_URL}/{lang}/ClinicalEntity/ApproximateName/{encoded_query}",
                 timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/Orphanet",
-                },
+                headers=get_rdcode_headers(),
             )
             response.raise_for_status()
             data = response.json()
 
+            # Parse results from API response
+            results = []
+            if isinstance(data, list):
+                results = data
+            elif isinstance(data, dict):
+                # API returns a dict with entities
+                results = data.get("entities", data.get("results", [data]))
+
             return {
                 "status": "success",
                 "data": {
-                    "results": data
-                    if isinstance(data, list)
-                    else data.get("results", []),
+                    "results": results,
                     "query": query,
                     "language": lang,
                 },
@@ -103,6 +126,12 @@ class OrphanetTool(BaseTool):
             }
 
         except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                return {
+                    "status": "success",
+                    "data": {"results": [], "query": query, "language": lang},
+                    "metadata": {"note": "No diseases found matching the query"},
+                }
             return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.RequestException as e:
             return {"status": "error", "error": f"Request failed: {str(e)}"}
@@ -129,30 +158,26 @@ class OrphanetTool(BaseTool):
         orpha_code = (
             str(orpha_code).replace("ORPHA:", "").replace("Orphanet:", "").strip()
         )
-        lang = arguments.get("lang", "en")
+        lang = normalize_lang(arguments.get("lang", "en"))
+        headers = get_rdcode_headers()
+
+        result_data = {"ORPHAcode": orpha_code}
 
         try:
-            # Get disease from RDcode API
-            response = requests.get(
-                f"{RDCODE_API_URL}/rd-nomenclature/orphacodes/{orpha_code}",
-                params={"lang": lang},
+            # Get preferred name: /{lang}/ClinicalEntity/orphacode/{orphacode}/Name
+            name_response = requests.get(
+                f"{RDCODE_API_URL}/{lang}/ClinicalEntity/orphacode/{orpha_code}/Name",
                 timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/Orphanet",
-                },
+                headers=headers,
             )
-            response.raise_for_status()
-            data = response.json()
-
-            return {
-                "status": "success",
-                "data": data,
-                "metadata": {
-                    "source": "Orphanet RDcode API",
-                    "orpha_code": orpha_code,
-                },
-            }
+            name_response.raise_for_status()
+            name_data = name_response.json()
+            if isinstance(name_data, dict):
+                result_data["Preferred term"] = name_data.get(
+                    "Preferred term", name_data.get("Name", "")
+                )
+            else:
+                result_data["Preferred term"] = str(name_data) if name_data else ""
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
@@ -161,10 +186,51 @@ class OrphanetTool(BaseTool):
                     "error": f"Disease not found: ORPHA:{orpha_code}",
                 }
             return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
-        except requests.exceptions.RequestException as e:
-            return {"status": "error", "error": f"Request failed: {str(e)}"}
-        except Exception as e:
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+
+        try:
+            # Get definition: /{lang}/ClinicalEntity/orphacode/{orphacode}/Definition
+            def_response = requests.get(
+                f"{RDCODE_API_URL}/{lang}/ClinicalEntity/orphacode/{orpha_code}/Definition",
+                timeout=self.timeout,
+                headers=headers,
+            )
+            if def_response.status_code == 200:
+                def_data = def_response.json()
+                if isinstance(def_data, dict):
+                    result_data["Definition"] = def_data.get("Definition", "")
+                else:
+                    result_data["Definition"] = str(def_data) if def_data else ""
+        except Exception:
+            result_data["Definition"] = ""
+
+        try:
+            # Get synonyms: /{lang}/ClinicalEntity/orphacode/{orphacode}/Synonym
+            syn_response = requests.get(
+                f"{RDCODE_API_URL}/{lang}/ClinicalEntity/orphacode/{orpha_code}/Synonym",
+                timeout=self.timeout,
+                headers=headers,
+            )
+            if syn_response.status_code == 200:
+                syn_data = syn_response.json()
+                if isinstance(syn_data, list):
+                    result_data["Synonyms"] = syn_data
+                elif isinstance(syn_data, dict):
+                    result_data["Synonyms"] = syn_data.get(
+                        "Synonyms", syn_data.get("Synonym", [])
+                    )
+                else:
+                    result_data["Synonyms"] = []
+        except Exception:
+            result_data["Synonyms"] = []
+
+        return {
+            "status": "success",
+            "data": result_data,
+            "metadata": {
+                "source": "Orphanet RDcode API",
+                "orpha_code": orpha_code,
+            },
+        }
 
     def _get_genes(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -186,7 +252,7 @@ class OrphanetTool(BaseTool):
         )
 
         try:
-            # Try Orphadata API for gene associations
+            # Use Orphadata API for gene associations (no auth required)
             response = requests.get(
                 f"{ORPHADATA_API_URL}/rd-cross-referencing/orphacodes/{orpha_code}/genes",
                 timeout=self.timeout,
@@ -242,17 +308,14 @@ class OrphanetTool(BaseTool):
         orpha_code = (
             str(orpha_code).replace("ORPHA:", "").replace("Orphanet:", "").strip()
         )
-        lang = arguments.get("lang", "en")
+        lang = normalize_lang(arguments.get("lang", "en"))
 
         try:
+            # Use RDcode API: /{lang}/ClinicalEntity/orphacode/{orphacode}/Classification
             response = requests.get(
-                f"{RDCODE_API_URL}/rd-nomenclature/orphacodes/{orpha_code}/classification",
-                params={"lang": lang},
+                f"{RDCODE_API_URL}/{lang}/ClinicalEntity/orphacode/{orpha_code}/Classification",
                 timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/Orphanet",
-                },
+                headers=get_rdcode_headers(),
             )
             response.raise_for_status()
             data = response.json()
@@ -270,6 +333,12 @@ class OrphanetTool(BaseTool):
             }
 
         except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                return {
+                    "status": "success",
+                    "data": {"orpha_code": orpha_code, "classification": []},
+                    "metadata": {"note": "No classification found"},
+                }
             return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.RequestException as e:
             return {"status": "error", "error": f"Request failed: {str(e)}"}
@@ -291,23 +360,37 @@ class OrphanetTool(BaseTool):
             return {"status": "error", "error": "Missing required parameter: name"}
 
         exact = arguments.get("exact", False)
-        lang = arguments.get("lang", "en")
+        lang = normalize_lang(arguments.get("lang", "en"))
 
         try:
-            endpoint = "findByName" if not exact else "findByExactName"
+            # URL encode the search name
+            encoded_name = urllib.parse.quote(name, safe="")
+
+            if exact:
+                # For exact match, use FindbyName endpoint
+                endpoint = (
+                    f"{RDCODE_API_URL}/{lang}/ClinicalEntity/FindbyName/{encoded_name}"
+                )
+            else:
+                # For partial match, use ApproximateName endpoint
+                endpoint = f"{RDCODE_API_URL}/{lang}/ClinicalEntity/ApproximateName/{encoded_name}"
+
             response = requests.get(
-                f"{RDCODE_API_URL}/rd-nomenclature/{endpoint}",
-                params={"name": name, "lang": lang},
+                endpoint,
                 timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/Orphanet",
-                },
+                headers=get_rdcode_headers(),
             )
             response.raise_for_status()
             data = response.json()
 
-            results = data if isinstance(data, list) else [data] if data else []
+            # Parse results from response
+            if isinstance(data, list):
+                results = data
+            elif isinstance(data, dict):
+                # Single result or wrapped in dict
+                results = data.get("entities", data.get("results", [data]))
+            else:
+                results = [data] if data else []
 
             return {
                 "status": "success",
@@ -327,7 +410,12 @@ class OrphanetTool(BaseTool):
             if e.response.status_code == 404:
                 return {
                     "status": "success",
-                    "data": {"results": [], "count": 0, "search_name": name},
+                    "data": {
+                        "results": [],
+                        "count": 0,
+                        "search_name": name,
+                        "exact_match": exact,
+                    },
                     "metadata": {"note": "No diseases found matching the name"},
                 }
             return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}

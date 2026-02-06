@@ -1,296 +1,260 @@
 """
-BindingDB API tool for ToolUniverse.
+BindingDB Tool - Query protein-ligand binding affinity data.
 
-BindingDB is a public database of measured binding affinities,
-focusing chiefly on interactions of proteins considered drug-targets
-with small, drug-like molecules.
-
-API Documentation: https://www.bindingdb.org/rwd/bind/BindingDBRESTfulAPI.jsp
-No authentication required.
+BindingDB contains 3.2M data points for 1.4M compounds and 11.4K targets.
+Provides binding affinities (Ki, IC50, Kd) for drug discovery research.
 """
 
-import requests
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from .base_tool import BaseTool
 from .tool_registry import register_tool
-
-# Base URL for BindingDB REST API
-BINDINGDB_API_URL = "https://bindingdb.org/rest"
+import requests
 
 
 @register_tool("BindingDBTool")
 class BindingDBTool(BaseTool):
-    """
-    Tool for querying BindingDB binding affinity database.
+    """Tool for querying BindingDB binding affinity database."""
 
-    BindingDB provides:
-    - Protein-ligand binding affinity data (IC50, Ki, Kd)
-    - Small molecule structures (SMILES)
-    - Target protein information
-    - Literature references
+    BASE_URL = "https://www.bindingdb.org/rest"
 
-    No authentication required. Free public access.
-    """
-
-    def __init__(self, tool_config: Dict[str, Any]):
+    def __init__(self, tool_config):
         super().__init__(tool_config)
-        self.timeout: int = tool_config.get(
-            "timeout", 60
-        )  # Longer timeout for large queries
         self.parameter = tool_config.get("parameter", {})
+        self.required = self.parameter.get("required", [])
+        self.operation = tool_config.get("fields", {}).get(
+            "operation", "get_ligands_by_uniprot"
+        )
 
     def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute BindingDB API call based on operation type."""
-        operation = arguments.get("operation", "")
+        """Route to appropriate operation handler."""
+        operation = self.operation
 
-        if operation == "get_by_uniprot":
-            return self._get_by_uniprot(arguments)
-        elif operation == "get_by_pdb":
-            return self._get_by_pdb(arguments)
-        elif operation == "get_by_target_name":
-            return self._get_by_target_name(arguments)
+        if operation == "get_ligands_by_uniprot":
+            return self._get_ligands_by_uniprot(arguments)
+        elif operation == "get_ligands_by_uniprots":
+            return self._get_ligands_by_uniprots(arguments)
+        elif operation == "get_ligands_by_pdb":
+            return self._get_ligands_by_pdb(arguments)
+        elif operation == "get_targets_by_compound":
+            return self._get_targets_by_compound(arguments)
         else:
-            return {
-                "status": "error",
-                "error": f"Unknown operation: {operation}. Supported: get_by_uniprot, get_by_pdb, get_by_target_name",
-            }
+            return {"status": "error", "error": f"Unknown operation: {operation}"}
 
-    def _get_by_uniprot(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Get binding data for a protein by UniProt accession.
+    def _get_ligands_by_uniprot(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get binding data for a single UniProt protein."""
+        uniprot = arguments.get("uniprot")
+        if not uniprot:
+            return {"status": "error", "error": "Missing required parameter: uniprot"}
 
-        Args:
-            arguments: Dict containing:
-                - uniprot_id: UniProt accession (e.g., P00533 for EGFR)
-                - affinity_cutoff: Max affinity in nM (default: 10000)
-        """
-        uniprot_id = arguments.get("uniprot_id", "")
-        if not uniprot_id:
-            return {
-                "status": "error",
-                "error": "Missing required parameter: uniprot_id",
-            }
-
-        affinity_cutoff = arguments.get("affinity_cutoff", 10000)
+        cutoff = arguments.get("affinity_cutoff", 10000)  # nM
 
         try:
             response = requests.get(
-                f"{BINDINGDB_API_URL}/getLigandsByUniprots",
+                f"{self.BASE_URL}/getLigandsByUniprot",
                 params={
-                    "uniprot": uniprot_id,
-                    "cutoff": affinity_cutoff,
+                    "uniprot": f"{uniprot};{cutoff}",
+                    "response": "application/json",
                 },
-                timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/BindingDB",
-                },
+                timeout=60,
             )
             response.raise_for_status()
 
-            # BindingDB returns tab-separated or JSON data
-            content_type = response.headers.get("Content-Type", "")
-            if "json" in content_type:
-                data = response.json()
-            else:
-                # Parse text response
-                data = self._parse_text_response(response.text)
+            data = response.json()
+
+            # Extract affinities from response
+            affinities = data.get("getLigandsByUniprotResponse", {}).get(
+                "affinities", []
+            )
+
+            if not affinities:
+                return {
+                    "status": "success",
+                    "data": [],
+                    "count": 0,
+                    "message": f"No binding data found for UniProt {uniprot} with affinity cutoff {cutoff} nM",
+                }
 
             return {
                 "status": "success",
-                "data": {
-                    "uniprot_id": uniprot_id,
-                    "affinity_cutoff_nM": affinity_cutoff,
-                    "ligands": data
-                    if isinstance(data, list)
-                    else data.get("ligands", []),
-                    "count": len(data)
-                    if isinstance(data, list)
-                    else data.get("count", 0),
-                },
-                "metadata": {
-                    "source": "BindingDB",
-                    "uniprot_id": uniprot_id,
-                },
+                "data": affinities,
+                "count": len(affinities),
+                "uniprot": uniprot,
+                "affinity_cutoff_nM": cutoff,
             }
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return {
-                    "status": "success",
-                    "data": {"uniprot_id": uniprot_id, "ligands": [], "count": 0},
-                    "metadata": {"note": "No binding data found for this UniProt ID"},
-                }
-            return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.Timeout:
-            return {
-                "status": "error",
-                "error": "Request timed out. Try a higher affinity cutoff.",
-            }
+            return {"status": "error", "error": "Request timed out after 60s"}
+        except requests.exceptions.HTTPError as e:
+            return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.RequestException as e:
             return {"status": "error", "error": f"Request failed: {str(e)}"}
         except Exception as e:
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+            return {"status": "error", "error": f"Error: {str(e)}"}
 
-    def _get_by_pdb(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Get binding data for proteins by PDB ID(s).
+    def _get_ligands_by_uniprots(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get binding data for multiple UniProt proteins."""
+        uniprots = arguments.get("uniprots")
+        if not uniprots:
+            return {"status": "error", "error": "Missing required parameter: uniprots"}
 
-        Args:
-            arguments: Dict containing:
-                - pdb_ids: Single PDB ID or comma-separated list (e.g., "1ABC,2XYZ")
-                - affinity_cutoff: Max affinity in nM (default: 100)
-                - sequence_identity: Min sequence identity % (default: 90)
-        """
-        pdb_ids = arguments.get("pdb_ids", "")
+        # Accept both string and list
+        if isinstance(uniprots, list):
+            uniprots = ",".join(uniprots)
+
+        cutoff = arguments.get("affinity_cutoff", 10000)  # nM
+
+        try:
+            response = requests.get(
+                f"{self.BASE_URL}/getLigandsByUniprots",
+                params={
+                    "uniprot": uniprots,
+                    "cutoff": cutoff,
+                    "response": "application/json",
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Extract affinities from response
+            affinities = data.get("getLindsByUniprotsResponse", {}).get(
+                "affinities", []
+            )
+
+            if not affinities:
+                return {
+                    "status": "success",
+                    "data": [],
+                    "count": 0,
+                    "message": f"No binding data found for UniProts {uniprots}",
+                }
+
+            return {
+                "status": "success",
+                "data": affinities,
+                "count": len(affinities),
+                "uniprots": uniprots,
+                "affinity_cutoff_nM": cutoff,
+            }
+
+        except requests.exceptions.Timeout:
+            return {"status": "error", "error": "Request timed out after 60s"}
+        except requests.exceptions.HTTPError as e:
+            return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
+        except requests.exceptions.RequestException as e:
+            return {"status": "error", "error": f"Request failed: {str(e)}"}
+        except Exception as e:
+            return {"status": "error", "error": f"Error: {str(e)}"}
+
+    def _get_ligands_by_pdb(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get binding data for proteins by PDB ID."""
+        pdb_ids = arguments.get("pdb_ids")
         if not pdb_ids:
             return {"status": "error", "error": "Missing required parameter: pdb_ids"}
 
-        affinity_cutoff = arguments.get("affinity_cutoff", 100)
-        sequence_identity = arguments.get("sequence_identity", 90)
+        # Accept both string and list
+        if isinstance(pdb_ids, list):
+            pdb_ids = ",".join(pdb_ids)
+
+        cutoff = arguments.get("affinity_cutoff", 10000)  # nM
+        identity = arguments.get("sequence_identity", 100)  # percent
 
         try:
             response = requests.get(
-                f"{BINDINGDB_API_URL}/getLigandsByPDBs",
+                f"{self.BASE_URL}/getLigandsByPDBs",
                 params={
                     "pdb": pdb_ids,
-                    "cutoff": affinity_cutoff,
-                    "identity": sequence_identity,
+                    "cutoff": cutoff,
+                    "identity": identity,
+                    "response": "application/json",
                 },
-                timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/BindingDB",
-                },
+                timeout=60,
             )
             response.raise_for_status()
 
-            content_type = response.headers.get("Content-Type", "")
-            if "json" in content_type:
-                data = response.json()
-            else:
-                data = self._parse_text_response(response.text)
+            data = response.json()
+
+            # Extract affinities from response
+            affinities = data.get("getLigandsByPDBsResponse", {}).get("affinities", [])
+
+            if not affinities:
+                return {
+                    "status": "success",
+                    "data": [],
+                    "count": 0,
+                    "message": f"No binding data found for PDB IDs {pdb_ids}",
+                }
 
             return {
                 "status": "success",
-                "data": {
-                    "pdb_ids": pdb_ids,
-                    "affinity_cutoff_nM": affinity_cutoff,
-                    "sequence_identity": sequence_identity,
-                    "ligands": data
-                    if isinstance(data, list)
-                    else data.get("ligands", []),
-                    "count": len(data)
-                    if isinstance(data, list)
-                    else data.get("count", 0),
-                },
-                "metadata": {
-                    "source": "BindingDB",
-                    "pdb_ids": pdb_ids,
-                },
+                "data": affinities,
+                "count": len(affinities),
+                "pdb_ids": pdb_ids,
+                "affinity_cutoff_nM": cutoff,
+                "sequence_identity": identity,
             }
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return {
-                    "status": "success",
-                    "data": {"pdb_ids": pdb_ids, "ligands": [], "count": 0},
-                    "metadata": {"note": "No binding data found for these PDB IDs"},
-                }
-            return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.Timeout:
-            return {"status": "error", "error": "Request timed out"}
+            return {"status": "error", "error": "Request timed out after 60s"}
+        except requests.exceptions.HTTPError as e:
+            return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.RequestException as e:
             return {"status": "error", "error": f"Request failed: {str(e)}"}
         except Exception as e:
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+            return {"status": "error", "error": f"Error: {str(e)}"}
 
-    def _get_by_target_name(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Search BindingDB by target protein name.
+    def _get_targets_by_compound(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get binding targets for a compound by SMILES."""
+        smiles = arguments.get("smiles")
+        if not smiles:
+            return {"status": "error", "error": "Missing required parameter: smiles"}
 
-        Args:
-            arguments: Dict containing:
-                - target_name: Protein target name (e.g., "EGFR", "kinase")
-                - affinity_cutoff: Max affinity in nM (default: 1000)
-        """
-        target_name = arguments.get("target_name", "")
-        if not target_name:
-            return {
-                "status": "error",
-                "error": "Missing required parameter: target_name",
-            }
-
-        affinity_cutoff = arguments.get("affinity_cutoff", 1000)
+        similarity_cutoff = arguments.get("similarity_cutoff", 0.85)
 
         try:
+            # URL encode the SMILES
+            import urllib.parse
+
+            urllib.parse.quote(smiles, safe="")
+
             response = requests.get(
-                f"{BINDINGDB_API_URL}/getLigandsByTargetName",
+                f"{self.BASE_URL}/getTargetByCompound",
                 params={
-                    "targetName": target_name,
-                    "cutoff": affinity_cutoff,
+                    "smiles": smiles,
+                    "cutoff": similarity_cutoff,
+                    "response": "application/json",
                 },
-                timeout=self.timeout,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "ToolUniverse/BindingDB",
-                },
+                timeout=60,
             )
             response.raise_for_status()
 
-            content_type = response.headers.get("Content-Type", "")
-            if "json" in content_type:
-                data = response.json()
-            else:
-                data = self._parse_text_response(response.text)
+            data = response.json()
+
+            # Extract targets from response
+            targets = data.get("getTargetByCompoundResponse", {}).get("affinities", [])
+
+            if not targets:
+                return {
+                    "status": "success",
+                    "data": [],
+                    "count": 0,
+                    "message": f"No targets found for compound with similarity cutoff {similarity_cutoff}",
+                }
 
             return {
                 "status": "success",
-                "data": {
-                    "target_name": target_name,
-                    "affinity_cutoff_nM": affinity_cutoff,
-                    "ligands": data
-                    if isinstance(data, list)
-                    else data.get("ligands", []),
-                    "count": len(data)
-                    if isinstance(data, list)
-                    else data.get("count", 0),
-                },
-                "metadata": {
-                    "source": "BindingDB",
-                    "target_name": target_name,
-                },
+                "data": targets,
+                "count": len(targets),
+                "smiles": smiles,
+                "similarity_cutoff": similarity_cutoff,
             }
 
+        except requests.exceptions.Timeout:
+            return {"status": "error", "error": "Request timed out after 60s"}
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return {
-                    "status": "success",
-                    "data": {"target_name": target_name, "ligands": [], "count": 0},
-                    "metadata": {"note": "No binding data found for this target"},
-                }
             return {"status": "error", "error": f"HTTP error: {e.response.status_code}"}
         except requests.exceptions.RequestException as e:
             return {"status": "error", "error": f"Request failed: {str(e)}"}
         except Exception as e:
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
-
-    def _parse_text_response(self, text: str) -> List[Dict[str, Any]]:
-        """Parse tab-separated text response from BindingDB."""
-        lines = text.strip().split("\n")
-        if len(lines) < 2:
-            return []
-
-        # First line is header
-        headers = lines[0].split("\t")
-        results = []
-
-        for line in lines[1:]:
-            values = line.split("\t")
-            if len(values) >= len(headers):
-                result = {}
-                for i, header in enumerate(headers):
-                    result[header] = values[i] if i < len(values) else ""
-                results.append(result)
-
-        return results
+            return {"status": "error", "error": f"Error: {str(e)}"}

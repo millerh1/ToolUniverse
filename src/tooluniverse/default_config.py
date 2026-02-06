@@ -307,6 +307,26 @@ default_tool_files = {
     "enamine": os.path.join(current_dir, "data", "enamine_tools.json"),
     # eMolecules - Vendor Aggregator
     "emolecules": os.path.join(current_dir, "data", "emolecules_tools.json"),
+    # Pharos/TCRD - NIH IDG Understudied Proteins Database
+    "pharos": os.path.join(current_dir, "data", "pharos_tools.json"),
+    # AlphaMissense - DeepMind Pathogenicity Predictions
+    "alphamissense": os.path.join(current_dir, "data", "alphamissense_tools.json"),
+    # CADD - Combined Annotation Dependent Depletion
+    "cadd": os.path.join(current_dir, "data", "cadd_tools.json"),
+    # DepMap - Cancer Dependency Map (Sanger Cell Model Passports)
+    "depmap": os.path.join(current_dir, "data", "depmap_tools.json"),
+    # InterProScan - Protein Domain/Family Prediction
+    "interproscan": os.path.join(current_dir, "data", "interproscan_tools.json"),
+    # EVE - Evolutionary Variant Effect Predictions
+    "eve": os.path.join(current_dir, "data", "eve_tools.json"),
+    # Thera-SAbDab - Therapeutic Structural Antibody Database
+    "therasabdab": os.path.join(current_dir, "data", "therasabdab_tools.json"),
+    # DeepGO - Protein Function Prediction
+    "deepgo": os.path.join(current_dir, "data", "deepgo_tools.json"),
+    # ClinGen - Gene-Disease Validity, Dosage Sensitivity, Actionability
+    "clingen": os.path.join(current_dir, "data", "clingen_tools.json"),
+    # SpliceAI - Deep Learning Splice Prediction
+    "spliceai": os.path.join(current_dir, "data", "spliceai_tools.json"),
 }
 
 # Auto-load any user-provided tools from ~/.tooluniverse/user_tools/

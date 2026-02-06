@@ -40,6 +40,12 @@ class TestBioStudiesToolDirect:
             "pageSize": 5
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
         assert "hits" in result["data"]
@@ -57,6 +63,12 @@ class TestBioStudiesToolDirect:
             "pageSize": 3
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
         assert "count" in result
@@ -70,6 +82,12 @@ class TestBioStudiesToolDirect:
             "accession": "S-BSST1254"
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
         assert isinstance(result["data"], dict)
@@ -82,6 +100,12 @@ class TestBioStudiesToolDirect:
         result = tool.run({
             "accession": "S-BSST1254"
         })
+        
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
         
         assert result["status"] == "success"
         assert "data" in result
@@ -147,6 +171,12 @@ class TestBioStudiesToolInterface:
             "pageSize": 5
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
     
@@ -158,6 +188,13 @@ class TestBioStudiesToolInterface:
             "pageSize": 3
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            # Skip test if API is temporarily unavailable
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
     
@@ -167,6 +204,12 @@ class TestBioStudiesToolInterface:
             "accession": "S-BSST1254"
         })
         
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
+        
         assert result["status"] == "success"
         assert "data" in result
     
@@ -175,6 +218,12 @@ class TestBioStudiesToolInterface:
         result = tu.tools.biostudies_get_study_files(**{
             "accession": "S-BSST1254"
         })
+        
+        # Handle transient API issues gracefully
+        if result["status"] == "error":
+            error_msg = result.get("error", "")
+            if any(x in error_msg.lower() for x in ["timeout", "connection", "503", "502", "500"]):
+                pytest.skip(f"BioStudies API temporarily unavailable: {error_msg}")
         
         assert result["status"] == "success"
         assert "data" in result
