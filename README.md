@@ -35,12 +35,14 @@
 <td width="50%" valign="top">
 
 **2️⃣ Install Agent Skills**
-
-`npx skills add mims-harvard/ToolUniverse`
+```bash
+npx skills add mims-harvard/ToolUniverse
+```
 
 **3️⃣ Install Package** (Optional)
-
-`uv pip install tooluniverse`
+```bash
+uv pip install tooluniverse
+```
 
 </td>
 </tr>
