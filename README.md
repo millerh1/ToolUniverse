@@ -16,7 +16,7 @@
 
 <table>
 <tr>
-<td width="50%" valign="top">
+<td width="45%" valign="top">
 
 **1️⃣ MCP Setup** – Add to your MCP config:
 ```json
