@@ -26,6 +26,7 @@ class EuropePMCTool(BaseTool):
         query = arguments.get("query")
         limit = arguments.get("limit", 5)
         enrich_missing_abstract = bool(arguments.get("enrich_missing_abstract", False))
+        extract_terms_from_fulltext = arguments.get("extract_terms_from_fulltext")
         if not query:
             return [
                 {
@@ -46,7 +47,10 @@ class EuropePMCTool(BaseTool):
                 }
             ]
         return self._search(
-            query, limit, enrich_missing_abstract=enrich_missing_abstract
+            query,
+            limit,
+            enrich_missing_abstract=enrich_missing_abstract,
+            extract_terms_from_fulltext=extract_terms_from_fulltext,
         )
 
     def _local_name(self, tag: str) -> str:
@@ -76,7 +80,14 @@ class EuropePMCTool(BaseTool):
             return f"https://www.ebi.ac.uk/europepmc/webservices/rest/{source_db}/{article_id}/fullTextXML"
         return None
 
-    def _search(self, query, limit, *, enrich_missing_abstract: bool = False):
+    def _search(
+        self,
+        query,
+        limit,
+        *,
+        enrich_missing_abstract: bool = False,
+        extract_terms_from_fulltext: list | None = None,
+    ):
         # First try core mode to get abstracts
         core_params = {
             "query": query,
@@ -310,6 +321,85 @@ class EuropePMCTool(BaseTool):
                     if isinstance(a.get("data_quality"), dict):
                         a["data_quality"]["has_abstract"] = True
                     enriched += 1
+
+        # Extract fulltext snippets if requested
+        if extract_terms_from_fulltext and isinstance(
+            extract_terms_from_fulltext, list
+        ):
+            # Filter valid terms (max 5)
+            valid_terms = [
+                t.strip()
+                for t in extract_terms_from_fulltext
+                if isinstance(t, str) and t.strip()
+            ][:5]
+
+            if valid_terms:
+                # Process up to 3 OA articles to avoid latency
+                max_snippet_articles = 3
+                processed = 0
+
+                for a in articles:
+                    if processed >= max_snippet_articles:
+                        break
+                    if not isinstance(a, dict):
+                        continue
+                    # Only process open access articles with fulltext URLs
+                    if not a.get("open_access"):
+                        continue
+                    fulltext_url = a.get("fulltext_xml_url")
+                    if not isinstance(fulltext_url, str) or not fulltext_url:
+                        continue
+
+                    # Extract snippets using the existing tool logic
+                    try:
+                        resp = request_with_retry(
+                            self.session,
+                            "GET",
+                            fulltext_url,
+                            timeout=30,
+                            max_attempts=2,
+                        )
+                        if resp.status_code != 200:
+                            continue
+
+                        # Extract text from XML
+                        try:
+                            root = ET.fromstring(resp.text or "")
+                            text = " ".join("".join(root.itertext()).split())
+                        except ET.ParseError:
+                            continue
+
+                        # Extract snippets around terms
+                        snippets = []
+                        total_chars = 0
+                        max_total_chars = 8000
+                        window_chars = 220
+                        max_snippets_per_term = 3
+                        low = text.lower()
+
+                        for term in valid_terms:
+                            needle = term.lower()
+                            found = 0
+                            for m in re.finditer(re.escape(needle), low):
+                                if found >= max_snippets_per_term:
+                                    break
+                                start = max(0, m.start() - window_chars)
+                                end = min(len(text), m.end() + window_chars)
+                                snippet = text[start:end].strip()
+                                if total_chars + len(snippet) > max_total_chars:
+                                    break
+                                snippets.append({"term": term, "snippet": snippet})
+                                total_chars += len(snippet)
+                                found += 1
+
+                        if snippets:
+                            a["fulltext_snippets"] = snippets
+                            a["fulltext_snippets_count"] = len(snippets)
+
+                        processed += 1
+                    except Exception:
+                        # Silently skip articles that fail snippet extraction
+                        continue
 
         return articles
 

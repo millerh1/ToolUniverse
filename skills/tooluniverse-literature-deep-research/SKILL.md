@@ -1,6 +1,6 @@
 ---
 name: tooluniverse-literature-deep-research
-description: Conduct comprehensive literature research with target disambiguation, evidence grading, and structured theme extraction. Creates a detailed report with mandatory completeness checklist, biological model synthesis, and testable hypotheses. For biological targets, resolves official IDs (Ensembl/UniProt), synonyms, naming collisions, and gathers expression/pathway context before literature search. Outputs report-only by default; methodology in separate appendix if requested. Use when users need thorough literature reviews, target profiles, or ask "what does the literature say about X?".
+description: Conduct comprehensive literature research with target disambiguation, evidence grading, and structured theme extraction. Creates a detailed report with mandatory completeness checklist, biological model synthesis, and testable hypotheses. For biological targets, resolves official IDs (Ensembl/UniProt), synonyms, naming collisions, and gathers expression/pathway context before literature search. Default deliverable is a report file; for single factoid questions, uses a fast verification mode and may include an inline answer. Use when users need thorough literature reviews, target profiles, or to verify specific claims from the literature.
 ---
 
 # Literature Deep Research Strategy (Enhanced)
@@ -9,10 +9,11 @@ A systematic approach to comprehensive literature research that **starts with ta
 
 **KEY PRINCIPLES**:
 1. **Target disambiguation FIRST** - Resolve IDs, synonyms, naming collisions before literature search
-2. **Report-only output** - No search process in the report; methodology in separate appendix only if requested
-3. **Evidence grading** - Grade every claim by evidence strength (mechanistic paper vs screen hit vs review vs text-mined)
-4. **Mandatory completeness** - All checklist sections must exist, even if "unknown/limited evidence"
-5. **Source attribution** - Every piece of information traceable to database/tool
+2. **Right-size the deliverable** - Use *Factoid / Verification Mode* for single, answerable questions; use full report mode for “deep research”
+3. **Report-first output** - Default deliverable is a report file; an inline answer is allowed (and recommended) for Factoid / Verification Mode
+4. **Evidence grading** - Grade every claim by evidence strength (mechanistic paper vs screen hit vs review vs text-mined)
+5. **Mandatory completeness** - All checklist sections must exist, even if "unknown/limited evidence"
+6. **Source attribution** - Every piece of information traceable to database/tool
 
 ---
 
@@ -21,7 +22,7 @@ A systematic approach to comprehensive literature research that **starts with ta
 ```
 User Query
   ↓
-Phase 0: CLARIFY (Is this a biological target? What scope?)
+Phase 0: CLARIFY + MODE SELECT (factoid vs deep report)
   ↓
 Phase 1: TARGET DISAMBIGUATION + PROFILE (default ON for biological targets)
   ├─ Resolve official IDs (Ensembl, UniProt, HGNC)
@@ -51,10 +52,66 @@ Optional: methods_appendix.md (only if user requests)
 ### Mandatory Questions
 
 1. **Target type**: Is this a biological target (gene/protein), a general topic, or a disease?
-2. **Scope**: Comprehensive review, druggability focus, mechanism focus, or quick overview?
+2. **Scope**: Is this a *single factoid to verify* (“Which antibiotic?”, “Which strain?”, “Which year?”) or a comprehensive/deep review?
 3. **Known aliases**: Any specific gene symbols or protein names you use?
 4. **Constraints**: Open access only? Include preprints? Specific organisms?
 5. **Methods appendix**: Do you want methodology details in a separate file?
+
+### Mode Selection (CRITICAL)
+
+Pick exactly one mode based on the user’s intent and the question structure:
+
+1. **Factoid / Verification Mode** (single concrete question; answer should be a short phrase/sentence)
+2. **Mini-review Mode** (narrow topic; 1–3 pages of synthesis)
+3. **Full Deep-Research Mode** (use the full template + completeness checklist)
+
+**Heuristic**:
+- If the user asks “X has been evolved to be resistant to *which antibiotic*?” → **Factoid / Verification Mode**
+- If the user asks “What does the literature say about X?” → **Full Deep-Research Mode**
+
+### Factoid / Verification Mode (Fast Path)
+
+**Goal**: Provide a correct, source-verified single answer, with minimal but explicit evidence attribution.
+
+**Deliverables** (still file-backed):
+1. `[topic]_factcheck_report.md` (≤ 1 page)
+2. `[topic]_bibliography.json` (+ CSV) containing the key paper(s)
+
+**Fact-check report template**:
+```markdown
+# [TOPIC]: Fact-check Report
+
+*Generated: [Date]*
+*Evidence cutoff: [Date]*
+
+## Question
+[User question]
+
+## Answer
+**[One-sentence answer]** [Evidence: ★★★/★★☆/★☆☆/☆☆☆]
+
+## Source(s)
+- [Primary paper citation: journal/year/PMID/DOI as available]
+
+## Verification Notes
+- [1–3 bullets: where in the paper the statement appears (Abstract/Results/Methods), and any key constraints]
+
+## Limitations
+- [If full text not available, or if only review evidence exists]
+```
+
+**Required verification behavior**:
+- Prefer ToolUniverse literature tools (Europe PMC / PubMed / PMC / Semantic Scholar) over general web browsing.
+- Use full-text snippet verification when possible (Europe PMC auto-snippet tier is ideal).
+- Avoid adding extra claims (e.g., “not X”) unless the paper explicitly supports them.
+
+**Suggested tool pattern**:
+- `EuropePMC_search_articles(query=..., extract_terms_from_fulltext=[...])` to pull OA full-text snippets for the key terms.
+- If OA snippets unavailable: fall back to `PMC_search_papers` (if in PMC) or `SemanticScholar_search_papers` → `SemanticScholar_get_pdf_snippets`.
+
+**Evidence grading (factoid)**:
+- If the statement is explicitly made in a primary experimental paper (Results/Methods/Abstract): label **T1 (★★★)**.
+- If it’s only in a review: label **T4 (☆☆☆)** and try to locate the primary source.
 
 ### Detect Target Type
 
@@ -276,12 +333,11 @@ Example for bacterial TraG collision:
 **Literature Search** (use all relevant):
 - `PubMed_search_articles` - Primary biomedical
 - `PMC_search_papers` - Full-text
-- `EuropePMC_search_articles` - European coverage (use `source='PPR'` for preprints)
+- `EuropePMC_search_articles` - European coverage
 - `openalex_literature_search` - Broad academic
 - `Crossref_search_works` - DOI registry
 - `SemanticScholar_search_papers` - AI-ranked
-- **Preprints**: Use `EuropePMC_search_articles` with `source='PPR'` or `web_search` with `site:biorxiv.org`
-- `BioRxiv_get_preprint` / `MedRxiv_get_preprint` - Get preprint by DOI (not for search)
+- `BioRxiv_search_preprints` / `MedRxiv_search_preprints` - Preprints
 
 **Citation Tools** (with failure handling):
 - `PubMed_get_cited_by` - Primary (NCBI elink can be flaky)
@@ -297,7 +353,165 @@ Example for bacterial TraG collision:
 - `OpenTargets_*` tools - Target-disease associations
 - `GO_get_annotations_for_gene` - GO terms
 
-### 2.3 Tool Failure Handling
+### 2.3 Full-Text Verification Strategy
+
+**WHEN TO USE**: Abstracts lack critical experimental details (exact drugs, cell lines, concentrations, specific protocols).
+
+**Three-Tier Strategy**:
+
+#### Tier 1: Auto-Snippet Mode (Europe PMC) - FASTEST
+
+**Use for**: Exploratory queries with 3-5 specific terms
+
+```python
+results = EuropePMC_search_articles(
+    query="bacterial antibiotic resistance evolution",
+    limit=10,
+    extract_terms_from_fulltext=["ciprofloxacin", "meropenem", "A. baumannii", "MIC"]
+)
+
+# Check which articles have full-text snippets
+for article in results:
+    if "fulltext_snippets" in article:
+        # Snippets automatically extracted from OA full text
+        for snippet in article["fulltext_snippets"]:
+            # Use snippet["term"] and snippet["snippet"] for verification
+            pass
+```
+
+**Advantages**:
+- ✅ Single tool call (search + snippets)
+- ✅ Bounded latency (max 3 OA articles, ~3-5 seconds total)
+- ✅ No manual URL extraction
+- ✅ Max 5 search terms
+
+**Limitations**:
+- ❌ Only works for OA articles with fullTextXML
+- ❌ Limited to first 3 OA articles
+- ❌ Europe PMC coverage only (~30-40% OA)
+
+**When to use**: Initial exploration, quick verification of 1-2 papers
+
+#### Tier 2: Manual Two-Step (Semantic Scholar, ArXiv) - TARGETED
+
+**Use for**: Specific high-value papers you identified from search
+
+```python
+# Step 1: Search
+papers = SemanticScholar_search_papers(
+    query="machine learning interpretability",
+    limit=10
+)
+
+# Step 2: Extract from specific OA papers
+for paper in papers:
+    if paper.get("open_access_pdf_url"):
+        snippets = SemanticScholar_get_pdf_snippets(
+            open_access_pdf_url=paper["open_access_pdf_url"],
+            terms=["SHAP", "gradient attribution", "layer-wise relevance"],
+            window_chars=300
+        )
+        if snippets["status"] == "success":
+            # Process snippets["snippets"]
+            pass
+```
+
+**ArXiv variant** (100% OA, no paywall):
+
+```python
+# All arXiv papers are freely available
+snippets = ArXiv_get_pdf_snippets(
+    arxiv_id="2301.12345",
+    terms=["attention mechanism", "self-attention", "layer normalization"],
+    max_snippets_per_term=5
+)
+```
+
+**Advantages**:
+- ✅ Full control over which papers to process
+- ✅ Adjustable window size (20-2000 chars)
+- ✅ Works for Semantic Scholar (~15-20% OA PDFs) and ArXiv (100%)
+- ✅ Can process any number of papers
+
+**Limitations**:
+- ❌ Two tool calls per article (search → extract)
+- ❌ Manual loop needed
+- ❌ Slower than auto-snippet mode
+
+**When to use**: Thorough review of key papers, preprint analysis
+
+#### Tier 3: Manual Download + Parse (Fallback) - SLOWEST
+
+**Use for**: Paywalled content via institutional access
+
+```python
+# For paywalled PDFs accessible via institution
+webpage_text = get_webpage_text_from_url(
+    url="https://doi.org/10.1016/...",
+    # Requires institutional proxy or VPN
+)
+
+# Extract relevant sections manually
+if "Methods" in webpage_text:
+    # Parse methods section
+    pass
+```
+
+**Limitations**:
+- ❌ Requires institutional access
+- ❌ No snippet extraction (full HTML)
+- ❌ Quality varies by publisher
+- ❌ Slowest approach
+
+**When to use**: Last resort for critical paywalled papers
+
+#### Decision Matrix
+
+| Scenario | Recommended Tier | Rationale |
+|----------|------------------|-----------|
+| Quick verification ("Which antibiotic?") | Tier 1 (Auto-snippet) | Fast, single call |
+| Preprint deep-dive (arXiv, bioRxiv) | Tier 2 (Manual ArXiv) | 100% coverage, no paywall |
+| High-value paper deep analysis | Tier 2 (Manual S2) | Precise control |
+| Systematic review (50+ papers) | Tier 1 + Tier 2 | Auto for OA, manual for key papers |
+| Paywalled critical paper | Tier 3 (Manual download) | Only option |
+
+#### Best Practices
+
+**1. Limit search terms to 3-5 specific keywords**:
+- ✅ Good: `["ciprofloxacin 5 μg/mL", "HEK293 cells", "RNA-seq"]`
+- ❌ Bad: `["drug", "method", "significant"]` (too broad)
+
+**2. Check OA status before extraction**:
+```python
+if article.get("open_access") and article.get("fulltext_xml_url"):
+    # Proceed with extraction
+    pass
+```
+
+**3. Adjust window size for context**:
+- Methods: 400-500 chars (full sentences)
+- Quick verification: 150-200 chars
+- Default: 220 chars (balanced)
+
+**4. Handle failures gracefully**:
+```python
+if "fulltext_snippets" not in article:
+    # Fallback: use abstract or skip
+    print(f"No full text available: {article['title']}")
+```
+
+**5. Document full-text sources in report**:
+```markdown
+## Methods Verification
+
+**Antibiotic concentrations** (verified from full text):
+- Study A: Ciprofloxacin 5 μg/mL [PMC12345, Methods section]
+- Study B: Meropenem 8 μg/mL [arXiv:2301.12345, Experimental Design]
+
+*Note: Full-text verification performed on 8/15 OA papers (53% coverage)*
+```
+
+### 2.5 Tool Failure Handling
 
 **Automatic retry strategy**:
 ```
@@ -320,7 +534,7 @@ If fallback fails:
 | `GTEx_get_median_gene_expression` | `HPA_get_rna_expression_by_source` | Document as unavailable |
 | `Unpaywall_check_oa_status` | Europe PMC OA flags | OpenAlex OA field |
 
-### 2.4 Open Access Handling (Best-Effort)
+### 2.6 Open Access Handling (Best-Effort)
 
 **If Unpaywall email provided**: Check OA status for all papers with DOIs
 
@@ -383,13 +597,14 @@ For each theme section, summarize evidence quality:
 
 ## Report Structure: Mandatory Completeness Checklist
 
-**CRITICAL**: ALL sections below must exist in the report, even if populated with "Limited evidence available" or "Unknown - no studies identified".
+**CRITICAL**: This checklist/template applies to **Full Deep-Research Mode**. For **Factoid / Verification Mode**, use a short fact-check report (see Phase 0) and do not force the full 15-section template.
 
 ### Output Files
 
-1. **`[topic]_report.md`** - Main narrative report (default deliverable)
-2. **`[topic]_bibliography.json`** - Full deduplicated bibliography (always created)
-3. **`methods_appendix.md`** - Methodology details (ONLY if user requests)
+1. **`[topic]_report.md`** - Main narrative report (**Full Deep-Research Mode**)
+2. **`[topic]_factcheck_report.md`** - Short verification report (**Factoid / Verification Mode**)
+3. **`[topic]_bibliography.json`** - Full deduplicated bibliography (always created)
+4. **`methods_appendix.md`** - Methodology details (ONLY if user requests)
 
 ### Report Template
 
@@ -772,7 +987,7 @@ For V-ATPase target example:
 ## Quick Reference: Tool Categories
 
 ### Literature Tools
-`PubMed_search_articles`, `PMC_search_papers`, `EuropePMC_search_articles` (use `source='PPR'` for preprints), `openalex_literature_search`, `Crossref_search_works`, `SemanticScholar_search_papers`, `BioRxiv_get_preprint`, `MedRxiv_get_preprint` (DOI retrieval only)
+`PubMed_search_articles`, `PMC_search_papers`, `EuropePMC_search_articles`, `openalex_literature_search`, `Crossref_search_works`, `SemanticScholar_search_papers`, `BioRxiv_search_preprints`, `MedRxiv_search_preprints`
 
 ### Citation Tools
 `PubMed_get_cited_by`, `PubMed_get_related`, `EuropePMC_get_citations`, `EuropePMC_get_references`
@@ -804,6 +1019,10 @@ For V-ATPase target example:
 - "Building core paper set with high-precision queries..."
 - "Expanding via citation network..."
 - "Clustering into themes and grading evidence..."
+
+**When the question looks like a factoid**:
+- Ask (once) if the user wants *just the verified answer* or a *full deep-research report*.
+- If the user doesn’t specify, default to **Factoid / Verification Mode** and keep it short + source-backed.
 
 **DO NOT** expose:
 - Raw tool outputs

@@ -19,6 +19,14 @@
           "type": "boolean",
           "description": "If true, best-effort fills missing abstracts by fetching Europe PMC fullTextXML (bounded to a few results).",
           "default": false
+        },
+        "extract_terms_from_fulltext": {
+          "type": "array",
+          "description": "Optional list of terms to extract from full text (open access only). When provided, automatically fetches fullTextXML for open-access articles and returns snippets around these terms. Max 5 terms, bounded to first 3 OA articles to avoid latency. Returns snippets in a 'fulltext_snippets' field for each article.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5
         }
       },
       "required": [
@@ -112,6 +120,27 @@
               "null"
             ],
             "description": "Source of abstract text (e.g., Europe PMC core or fullTextXML)"
+          },
+          "fulltext_snippets": {
+            "type": "array",
+            "description": "Full-text snippets around search terms (only present when extract_terms_from_fulltext is provided and article is OA)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "term": {
+                  "type": "string",
+                  "description": "The search term that was matched"
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "Text snippet with context around the matched term"
+                }
+              }
+            }
+          },
+          "fulltext_snippets_count": {
+            "type": "integer",
+            "description": "Number of snippets extracted (only present when fulltext_snippets exists)"
           },
           "citations": {
             "type": "integer",

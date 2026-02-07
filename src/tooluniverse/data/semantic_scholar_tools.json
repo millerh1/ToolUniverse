@@ -132,5 +132,96 @@
         "limit": 1
       }
     ]
+  },
+  {
+    "type": "SemanticScholarPDFSnippetsTool",
+    "name": "SemanticScholar_get_pdf_snippets",
+    "description": "Fetch a paper's open-access PDF from Semantic Scholar and return bounded text snippets around provided terms. Uses markitdown to convert PDF to markdown. Useful when key details (methods, experimental parameters) are in the full text rather than abstract.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "paper_id": {
+          "type": "string",
+          "description": "Semantic Scholar paper ID (e.g., from SemanticScholar_search_papers). The tool will fetch the PDF URL if available."
+        },
+        "open_access_pdf_url": {
+          "type": "string",
+          "description": "Direct open access PDF URL (recommended when you already have it from SemanticScholar_search_papers)."
+        },
+        "terms": {
+          "type": "array",
+          "description": "Terms to search for in the extracted full text (case-insensitive).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "window_chars": {
+          "type": "integer",
+          "description": "Context window size (characters) before and after each match.",
+          "default": 220,
+          "minimum": 20,
+          "maximum": 2000
+        },
+        "max_snippets_per_term": {
+          "type": "integer",
+          "description": "Maximum number of snippets returned per term.",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max_total_chars": {
+          "type": "integer",
+          "description": "Hard cap on total characters returned across all snippets.",
+          "default": 8000,
+          "minimum": 1000,
+          "maximum": 50000
+        }
+      },
+      "required": [
+        "terms"
+      ]
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "success or error"
+        },
+        "pdf_url": {
+          "type": "string",
+          "description": "The PDF URL that was processed"
+        },
+        "snippets": {
+          "type": "array",
+          "description": "Extracted text snippets",
+          "items": {
+            "type": "object",
+            "properties": {
+              "term": {
+                "type": "string",
+                "description": "The search term that was matched"
+              },
+              "snippet": {
+                "type": "string",
+                "description": "Text snippet with context around the matched term"
+              }
+            }
+          }
+        },
+        "snippets_count": {
+          "type": "integer",
+          "description": "Number of snippets extracted"
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "Whether output was truncated due to max_total_chars limit"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message (only present if status is error)"
+        }
+      }
+    }
   }
 ]

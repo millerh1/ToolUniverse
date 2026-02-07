@@ -48,8 +48,6 @@ uv pip install tooluniverse
 </tr>
 </table>
 
-----
-
 
 We are currently looking for partners. If you’re interested, please reach out to [Shanghua Gao](shanghuagao@gmail.com).
 
