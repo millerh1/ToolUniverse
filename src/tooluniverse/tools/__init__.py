@@ -1,7 +1,7 @@
 """
 ToolUniverse Tools
 
-Type-safe Python interface to 1224 scientific tools.
+Type-safe Python interface to 1228 scientific tools.
 Each tool is in its own module for minimal import overhead.
 
 Usage:
@@ -54,6 +54,7 @@ from .AdverseEventPredictionQuestionGeneratorWithContext import (
 from .AlphaMissense_get_protein_scores import AlphaMissense_get_protein_scores
 from .AlphaMissense_get_residue_scores import AlphaMissense_get_residue_scores
 from .AlphaMissense_get_variant_score import AlphaMissense_get_variant_score
+from .ArXiv_get_pdf_snippets import ArXiv_get_pdf_snippets
 from .ArXiv_search_papers import ArXiv_search_papers
 from .ArgumentDescriptionOptimizer import ArgumentDescriptionOptimizer
 from .BLAST_nucleotide_search import BLAST_nucleotide_search
@@ -196,6 +197,8 @@ from .Enamine_search_smiles import Enamine_search_smiles
 from .EthicalComplianceReviewer import EthicalComplianceReviewer
 from .EuropePMC_Guidelines_Search import EuropePMC_Guidelines_Search
 from .EuropePMC_get_citations import EuropePMC_get_citations
+from .EuropePMC_get_fulltext import EuropePMC_get_fulltext
+from .EuropePMC_get_fulltext_snippets import EuropePMC_get_fulltext_snippets
 from .EuropePMC_get_references import EuropePMC_get_references
 from .EuropePMC_search_articles import EuropePMC_search_articles
 from .ExperimentalDesignScorer import ExperimentalDesignScorer
@@ -1046,6 +1049,7 @@ from .STITCH_get_interaction_partners import STITCH_get_interaction_partners
 from .STITCH_resolve_identifier import STITCH_resolve_identifier
 from .STRING_get_protein_interactions import STRING_get_protein_interactions
 from .ScientificTextSummarizer import ScientificTextSummarizer
+from .SemanticScholar_get_pdf_snippets import SemanticScholar_get_pdf_snippets
 from .SemanticScholar_search_papers import SemanticScholar_search_papers
 from .SpliceAI_get_max_delta import SpliceAI_get_max_delta
 from .SpliceAI_predict_pangolin import SpliceAI_predict_pangolin
@@ -1730,6 +1734,7 @@ __all__ = [
     "AlphaMissense_get_protein_scores",
     "AlphaMissense_get_residue_scores",
     "AlphaMissense_get_variant_score",
+    "ArXiv_get_pdf_snippets",
     "ArXiv_search_papers",
     "ArgumentDescriptionOptimizer",
     "BLAST_nucleotide_search",
@@ -1870,6 +1875,8 @@ __all__ = [
     "EthicalComplianceReviewer",
     "EuropePMC_Guidelines_Search",
     "EuropePMC_get_citations",
+    "EuropePMC_get_fulltext",
+    "EuropePMC_get_fulltext_snippets",
     "EuropePMC_get_references",
     "EuropePMC_search_articles",
     "ExperimentalDesignScorer",
@@ -2364,6 +2371,7 @@ __all__ = [
     "STITCH_resolve_identifier",
     "STRING_get_protein_interactions",
     "ScientificTextSummarizer",
+    "SemanticScholar_get_pdf_snippets",
     "SemanticScholar_search_papers",
     "SpliceAI_get_max_delta",
     "SpliceAI_predict_pangolin",

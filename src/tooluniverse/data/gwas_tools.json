@@ -14,6 +14,14 @@
           "type": "string",
           "description": "Full EFO ontology URI (e.g., 'http://www.ebi.ac.uk/efo/EFO_0001645')"
         },
+        "efo_id": {
+          "type": "string",
+          "description": "EFO/OBA term ID (e.g., 'EFO_0001645', 'OBA_2050062'). Recommended for reliable trait filtering."
+        },
+        "efo_trait": {
+          "type": "string",
+          "description": "Exact EFO trait label (e.g., 'serum alanine aminotransferase amount'). Use when you know the canonical trait string."
+        },
         "rs_id": {
           "type": "string",
           "description": "dbSNP rs identifier"
@@ -206,6 +214,14 @@
         "efo_uri": {
           "type": "string",
           "description": "Full EFO ontology URI (e.g., 'http://www.ebi.ac.uk/efo/EFO_0001645')"
+        },
+        "efo_id": {
+          "type": "string",
+          "description": "EFO/OBA term ID (e.g., 'EFO_0001645', 'OBA_2050062'). Recommended for reliable trait filtering."
+        },
+        "efo_trait": {
+          "type": "string",
+          "description": "Exact EFO trait label. Use when you know the canonical trait string."
         },
         "cohort": {
           "type": "string",
@@ -914,6 +930,14 @@
           "type": "string",
           "description": "Full EFO ontology URI (e.g., 'http://www.ebi.ac.uk/efo/EFO_0001645')"
         },
+        "efo_id": {
+          "type": "string",
+          "description": "EFO/OBA term ID (e.g., 'EFO_0001645', 'OBA_2050062'). Recommended for reliable trait filtering."
+        },
+        "efo_trait": {
+          "type": "string",
+          "description": "Exact EFO trait label. Use when you know the canonical trait string."
+        },
         "size": {
           "type": "integer",
           "description": "Number of results to return per page"
@@ -925,7 +949,9 @@
       },
       "oneOf": [
         {"required": ["disease_trait"]},
-        {"required": ["efo_uri"]}
+        {"required": ["efo_uri"]},
+        {"required": ["efo_id"]},
+        {"required": ["efo_trait"]}
       ]
     },
     "label": [
@@ -1059,6 +1085,14 @@
           "type": "string",
           "description": "Full EFO ontology URI (e.g., 'http://www.ebi.ac.uk/efo/EFO_0001645')"
         },
+        "efo_id": {
+          "type": "string",
+          "description": "EFO/OBA term ID (e.g., 'EFO_0001645', 'OBA_2050062'). Recommended for reliable trait filtering."
+        },
+        "efo_trait": {
+          "type": "string",
+          "description": "Exact EFO trait label. Use when you know the canonical trait string."
+        },
         "size": {
           "type": "integer",
           "description": "Number of results to return per page"
@@ -1070,7 +1104,9 @@
       },
       "oneOf": [
         {"required": ["disease_trait"]},
-        {"required": ["efo_uri"]}
+        {"required": ["efo_uri"]},
+        {"required": ["efo_id"]},
+        {"required": ["efo_trait"]}
       ]
     },
     "label": [
@@ -1425,6 +1461,14 @@
           "type": "string",
           "description": "Full EFO ontology URI (e.g., 'http://www.ebi.ac.uk/efo/EFO_0001645')"
         },
+        "efo_id": {
+          "type": "string",
+          "description": "EFO/OBA term ID (e.g., 'EFO_0001645', 'OBA_2050062'). Recommended for reliable trait filtering."
+        },
+        "efo_trait": {
+          "type": "string",
+          "description": "Exact EFO trait label. Use when you know the canonical trait string."
+        },
         "cohort": {
           "type": "string",
           "description": "Cohort name (e.g., 'UKB' for UK Biobank)"
@@ -1448,7 +1492,9 @@
       },
       "oneOf": [
         {"required": ["disease_trait"]},
-        {"required": ["efo_uri"]}
+        {"required": ["efo_uri"]},
+        {"required": ["efo_id"]},
+        {"required": ["efo_trait"]}
       ]
     },
     "label": [

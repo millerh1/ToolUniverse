@@ -6,6 +6,271 @@ import xml.etree.ElementTree as ET
 import re
 
 
+def _normalize_pmcid(pmcid: str | None) -> tuple[str | None, str | None]:
+    """
+    Return (pmcid_norm, pmcid_digits).
+
+    pmcid_norm: "PMC123" form (or None)
+    pmcid_digits: "123" digits only (or None)
+    """
+    if not isinstance(pmcid, str):
+        return None, None
+    s = pmcid.strip()
+    if not s:
+        return None, None
+    upper = s.upper()
+    pmcid_norm = upper if upper.startswith("PMC") else f"PMC{upper}"
+    digits = pmcid_norm[3:]
+    if not digits.isdigit():
+        return pmcid_norm, None
+    return pmcid_norm, digits
+
+
+def _build_ncbi_pmc_oai_url(pmcid_digits: str | None) -> str | None:
+    if not isinstance(pmcid_digits, str) or not pmcid_digits.isdigit():
+        return None
+    return (
+        "https://www.ncbi.nlm.nih.gov/pmc/oai/oai.cgi"
+        f"?verb=GetRecord&metadataPrefix=pmc&identifier=oai:pubmedcentral.nih.gov:{pmcid_digits}"
+    )
+
+
+def _build_ncbi_pmc_efetch_url(pmcid_digits: str | None) -> str | None:
+    if not isinstance(pmcid_digits, str) or not pmcid_digits.isdigit():
+        return None
+    return (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        f"?db=pmc&id={pmcid_digits}&retmode=xml"
+    )
+
+
+def _build_ncbi_pmc_html_url(pmcid_norm: str | None) -> str | None:
+    if not isinstance(pmcid_norm, str) or not pmcid_norm.strip():
+        return None
+    s = pmcid_norm.strip()
+    s = s if s.upper().startswith("PMC") else f"PMC{s}"
+    return f"https://pmc.ncbi.nlm.nih.gov/articles/{s}/"
+
+
+def _extract_text_from_html(html_text: str) -> str:
+    """
+    Best-effort HTML -> text extraction.
+
+    For PMC pages, try to restrict to the main content region to avoid nav/JS/CSS noise.
+    """
+    html_text = html_text or ""
+
+    # Prefer main article content on PMC pages.
+    m = re.search(
+        r'(?is)<main[^>]*id=["\\\']maincontent["\\\'][^>]*>(.*?)</main>', html_text
+    )
+    if not m:
+        m = re.search(
+            r'(?is)<div[^>]*id=["\\\']maincontent["\\\'][^>]*>(.*?)</div>', html_text
+        )
+    if m:
+        html_text = m.group(1)
+
+    # Strip scripts/styles/noscript, then tags, then collapse whitespace.
+    # NOTE: use a real backreference (`</\1>`), not a literal `</\\1>`.
+    html_text = re.sub(r"(?is)<(script|style|noscript).*?>.*?</\1>", " ", html_text)
+    text = re.sub(r"(?s)<[^>]+>", " ", html_text)
+    # Basic HTML entity decoding.
+    try:
+        from html import unescape
+
+        text = unescape(text)
+    except Exception:
+        pass
+    return " ".join(text.split())
+
+
+def _extract_abstract_from_pmc_html(html_text: str) -> str | None:
+    # Try meta tags first (most robust for machines).
+    candidates = [
+        r'(?is)<meta\\s+name=["\\\']citation_abstract["\\\']\\s+content=["\\\'](.*?)["\\\']',
+        r'(?is)<meta\\s+name=["\\\']DC\\.Description["\\\']\\s+content=["\\\'](.*?)["\\\']',
+        r'(?is)<meta\\s+name=["\\\']dc\\.description["\\\']\\s+content=["\\\'](.*?)["\\\']',
+    ]
+    for pat in candidates:
+        m = re.search(pat, html_text or "")
+        if m:
+            abstract = m.group(1)
+            abstract = _extract_text_from_html(abstract)
+            if abstract:
+                return abstract
+    return None
+
+
+def _detect_ncbi_oai_error(xml_text: str) -> dict | None:
+    """
+    NCBI PMC OAI-PMH often returns HTTP 200 even for logical errors, e.g.:
+      <error code="cannotDisseminateFormat">...</error>
+
+    Returns a small structured dict when an error is detected, else None.
+    """
+    if not isinstance(xml_text, str) or not xml_text.strip():
+        return None
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+    # Only treat OAI-PMH top-level <error> as a logical error.
+    if not (root.tag or "").lower().endswith("oai-pmh"):
+        return None
+    for el in list(root):
+        if (el.tag or "").endswith("error"):
+            code = el.attrib.get("code")
+            msg = " ".join((el.text or "").split()) or None
+            return {"code": code, "message": msg}
+    return None
+
+
+def _fetch_fulltext_with_trace(
+    session: requests.Session,
+    *,
+    europe_fulltext_xml_url: str | None,
+    pmcid: str | None,
+    timeout: int = 20,
+) -> dict:
+    """
+    Fetch full text content with a trace of attempts.
+
+    Returns:
+      {
+        ok: bool,
+        url: str|None,
+        source: str|None,
+        format: "xml"|"html"|None,
+        content_type: str|None,
+        status_code: int|None,
+        content: str|None,
+        trace: list[dict],
+      }
+    """
+    pmcid_norm, pmcid_digits = _normalize_pmcid(pmcid)
+    trace: list[dict] = []
+
+    def _record(
+        attempt: str, url: str | None, resp, *, note: str | None = None
+    ) -> None:
+        headers = getattr(resp, "headers", {}) or {}
+        entry = {
+            "attempt": attempt,
+            "url": url,
+            "status_code": getattr(resp, "status_code", None),
+            "content_type": headers.get("content-type"),
+            "note": note,
+        }
+        trace.append(entry)
+
+    # 1) Europe PMC fullTextXML
+    if isinstance(europe_fulltext_xml_url, str) and europe_fulltext_xml_url.strip():
+        url = europe_fulltext_xml_url.strip()
+        resp = request_with_retry(session, "GET", url, timeout=timeout, max_attempts=2)
+        _record("europe_pmc_fulltextxml", getattr(resp, "url", url), resp)
+        if resp.status_code == 200 and (resp.text or "").strip():
+            headers = getattr(resp, "headers", {}) or {}
+            return {
+                "ok": True,
+                "url": getattr(resp, "url", url),
+                "source": "Europe PMC fullTextXML",
+                "format": "xml",
+                "content_type": headers.get("content-type"),
+                "status_code": resp.status_code,
+                "content": resp.text,
+                "trace": trace,
+            }
+
+    # 2) NCBI PMC OAI-PMH (JATS XML)
+    oai_url = _build_ncbi_pmc_oai_url(pmcid_digits)
+    if oai_url:
+        resp = request_with_retry(
+            session, "GET", oai_url, timeout=timeout, max_attempts=2
+        )
+        oai_err = None
+        if resp.status_code == 200 and (resp.text or "").strip():
+            oai_err = _detect_ncbi_oai_error(resp.text)
+        note = None
+        if oai_err:
+            code = oai_err.get("code") or "unknown"
+            msg = oai_err.get("message")
+            note = f"oai_error:{code}" + (f":{msg}" if msg else "")
+        _record("ncbi_pmc_oai", getattr(resp, "url", oai_url), resp, note=note)
+
+        if resp.status_code == 200 and (resp.text or "").strip() and not oai_err:
+            headers = getattr(resp, "headers", {}) or {}
+            return {
+                "ok": True,
+                "url": getattr(resp, "url", oai_url),
+                "source": "NCBI PMC OAI (JATS)",
+                "format": "xml",
+                "content_type": headers.get("content-type"),
+                "status_code": resp.status_code,
+                "content": resp.text,
+                "trace": trace,
+            }
+
+    # 3) NCBI PMC efetch (XML) - may return a restricted stub.
+    efetch_url = _build_ncbi_pmc_efetch_url(pmcid_digits)
+    if efetch_url:
+        resp = request_with_retry(
+            session, "GET", efetch_url, timeout=timeout, max_attempts=2
+        )
+        note = None
+        if resp.status_code == 200 and (resp.text or "").strip():
+            # Some publishers return a stub like: "does not allow download".
+            lowered = (resp.text or "").lower()
+            if "does not allow download" not in lowered:
+                _record("ncbi_pmc_efetch", getattr(resp, "url", efetch_url), resp)
+                headers = getattr(resp, "headers", {}) or {}
+                return {
+                    "ok": True,
+                    "url": getattr(resp, "url", efetch_url),
+                    "source": "NCBI PMC efetch (XML)",
+                    "format": "xml",
+                    "content_type": headers.get("content-type"),
+                    "status_code": resp.status_code,
+                    "content": resp.text,
+                    "trace": trace,
+                }
+            note = "restricted_stub"
+        _record("ncbi_pmc_efetch", getattr(resp, "url", efetch_url), resp, note=note)
+
+    # 4) NCBI PMC HTML (last resort)
+    html_url = _build_ncbi_pmc_html_url(pmcid_norm)
+    if html_url:
+        resp = request_with_retry(
+            session, "GET", html_url, timeout=timeout, max_attempts=2
+        )
+        note = "forbidden" if resp.status_code == 403 else None
+        _record("ncbi_pmc_html", getattr(resp, "url", html_url), resp, note=note)
+        if resp.status_code == 200 and (resp.text or "").strip():
+            headers = getattr(resp, "headers", {}) or {}
+            return {
+                "ok": True,
+                "url": getattr(resp, "url", html_url),
+                "source": "NCBI PMC HTML",
+                "format": "html",
+                "content_type": headers.get("content-type"),
+                "status_code": resp.status_code,
+                "content": resp.text,
+                "trace": trace,
+            }
+
+    last = trace[-1] if trace else {}
+    return {
+        "ok": False,
+        "url": last.get("url"),
+        "source": None,
+        "format": None,
+        "content_type": last.get("content_type"),
+        "status_code": last.get("status_code"),
+        "content": None,
+        "trace": trace,
+    }
+
+
 @register_tool("EuropePMCTool")
 class EuropePMCTool(BaseTool):
     """
@@ -20,7 +285,18 @@ class EuropePMCTool(BaseTool):
         super().__init__(tool_config)
         self.base_url = base_url
         self.session = requests.Session()
-        self.session.headers.update({"Accept": "application/json"})
+        self.session.headers.update(
+            {
+                "Accept": "application/json",
+                # Some upstreams (notably NCBI/PMC) return 403 for the default
+                # python-requests User-Agent. Set a conservative browser UA.
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            }
+        )
 
     def run(self, arguments):
         query = arguments.get("query")
@@ -79,6 +355,38 @@ class EuropePMCTool(BaseTool):
         if source_db and article_id:
             return f"https://www.ebi.ac.uk/europepmc/webservices/rest/{source_db}/{article_id}/fullTextXML"
         return None
+
+    def _build_pmc_oai_url(self, pmcid: str | None) -> str | None:
+        """
+        Build an NCBI PMC OAI-PMH URL to retrieve JATS XML for a PMC article.
+
+        Europe PMC fullTextXML is not always available even when an article is in PMC.
+        The OAI endpoint provides a robust fallback for extracting full text/abstract.
+        """
+        if not isinstance(pmcid, str):
+            return None
+        s = pmcid.strip()
+        if not s:
+            return None
+        s = s.upper()
+        if s.startswith("PMC"):
+            s = s[3:]
+        if not s.isdigit():
+            return None
+        return (
+            "https://www.ncbi.nlm.nih.gov/pmc/oai/oai.cgi"
+            f"?verb=GetRecord&metadataPrefix=pmc&identifier=oai:pubmedcentral.nih.gov:{s}"
+        )
+
+    def _fetch_fulltext_with_trace(
+        self, *, fulltext_url: str | None, pmcid: str | None, timeout: int = 20
+    ) -> dict:
+        return _fetch_fulltext_with_trace(
+            self.session,
+            europe_fulltext_xml_url=fulltext_url,
+            pmcid=pmcid,
+            timeout=timeout,
+        )
 
     def _search(
         self,
@@ -303,21 +611,25 @@ class EuropePMCTool(BaseTool):
                 fulltext_url = a.get("fulltext_xml_url")
                 if not isinstance(fulltext_url, str) or not fulltext_url:
                     continue
-                resp = request_with_retry(
-                    self.session,
-                    "GET",
-                    fulltext_url,
-                    timeout=20,
-                    max_attempts=2,
+                fetch = self._fetch_fulltext_with_trace(
+                    fulltext_url=fulltext_url, pmcid=a.get("pmcid"), timeout=20
                 )
-                if resp.status_code != 200:
+                content = fetch.get("content")
+                if not isinstance(content, str) or not content.strip():
                     continue
-                abstract_from_fulltext = self._extract_abstract_from_fulltext_xml(
-                    resp.text
-                )
+
+                abstract_from_fulltext = None
+                if fetch.get("format") == "xml":
+                    abstract_from_fulltext = self._extract_abstract_from_fulltext_xml(
+                        content
+                    )
+                elif fetch.get("format") == "html":
+                    abstract_from_fulltext = _extract_abstract_from_pmc_html(content)
+
                 if abstract_from_fulltext:
                     a["abstract"] = abstract_from_fulltext
-                    a["abstract_source"] = "Europe PMC fullTextXML"
+                    a["abstract_source"] = fetch.get("source") or "fulltext"
+                    a["abstract_retrieval_trace"] = fetch.get("trace") or []
                     if isinstance(a.get("data_quality"), dict):
                         a["data_quality"]["has_abstract"] = True
                     enriched += 1
@@ -359,22 +671,21 @@ class EuropePMCTool(BaseTool):
 
                     # Extract snippets using the existing tool logic
                     try:
-                        resp = request_with_retry(
-                            self.session,
-                            "GET",
-                            fulltext_url,
-                            timeout=30,
-                            max_attempts=2,
+                        fetch = self._fetch_fulltext_with_trace(
+                            fulltext_url=fulltext_url, pmcid=a.get("pmcid"), timeout=30
                         )
-                        if resp.status_code != 200:
+                        content = fetch.get("content")
+                        if not isinstance(content, str) or not content.strip():
                             continue
 
-                        # Extract text from XML
-                        try:
-                            root = ET.fromstring(resp.text or "")
-                            text = " ".join("".join(root.itertext()).split())
-                        except ET.ParseError:
-                            continue
+                        if fetch.get("format") == "xml":
+                            try:
+                                root = ET.fromstring(content or "")
+                                text = " ".join("".join(root.itertext()).split())
+                            except ET.ParseError:
+                                continue
+                        else:
+                            text = _extract_text_from_html(content)
 
                         # Extract snippets around terms, processing all batches
                         snippets = []
@@ -406,6 +717,10 @@ class EuropePMCTool(BaseTool):
                         if snippets:
                             a["fulltext_snippets"] = snippets
                             a["fulltext_snippets_count"] = len(snippets)
+                            a["fulltext_snippets_source"] = fetch.get("source")
+                            a["fulltext_snippets_retrieval_trace"] = (
+                                fetch.get("trace") or []
+                            )
 
                         processed += 1
                     except Exception:
@@ -428,7 +743,40 @@ class EuropePMCFullTextSnippetsTool(BaseTool):
         super().__init__(tool_config)
         self.session = requests.Session()
         self.session.headers.update(
-            {"Accept": "application/xml, text/xml;q=0.9, */*;q=0.8"}
+            {
+                "Accept": "application/xml, text/xml;q=0.9, */*;q=0.8",
+                # NCBI/PMC frequently blocks the default python-requests UA.
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            }
+        )
+
+    def _build_pmc_html_url(self, pmcid: str | None) -> str | None:
+        if not isinstance(pmcid, str):
+            return None
+        s = pmcid.strip()
+        if not s:
+            return None
+        s = s if s.upper().startswith("PMC") else f"PMC{s}"
+        return f"https://pmc.ncbi.nlm.nih.gov/articles/{s}/"
+
+    def _build_pmc_oai_url(self, pmcid: str | None) -> str | None:
+        if not isinstance(pmcid, str):
+            return None
+        s = pmcid.strip()
+        if not s:
+            return None
+        s = s.upper()
+        if s.startswith("PMC"):
+            s = s[3:]
+        if not s.isdigit():
+            return None
+        return (
+            "https://www.ncbi.nlm.nih.gov/pmc/oai/oai.cgi"
+            f"?verb=GetRecord&metadataPrefix=pmc&identifier=oai:pubmedcentral.nih.gov:{s}"
         )
 
     def _build_fulltext_xml_url(self, arguments: dict) -> str | None:
@@ -460,6 +808,19 @@ class EuropePMCFullTextSnippetsTool(BaseTool):
         root = ET.fromstring(xml_text)
         # Collapse whitespace to make snippets readable and stable.
         return " ".join("".join(root.itertext()).split())
+
+    def _extract_text_from_html(self, html_text: str) -> str:
+        # Dependency-light parsing: strip scripts/styles, tags, and collapse whitespace.
+        html_text = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", html_text or "")
+        text = re.sub(r"(?s)<[^>]+>", " ", html_text)
+        # Basic HTML entity decoding.
+        try:
+            from html import unescape
+
+            text = unescape(text)
+        except Exception:
+            pass
+        return " ".join(text.split())
 
     def run(self, arguments):
         fulltext_url = self._build_fulltext_xml_url(arguments)
@@ -498,26 +859,35 @@ class EuropePMCFullTextSnippetsTool(BaseTool):
             max_total_chars = 8000
         max_total_chars = max(1000, min(max_total_chars, 50000))
 
-        resp = request_with_retry(
-            self.session, "GET", fulltext_url, timeout=30, max_attempts=3
+        fetch = _fetch_fulltext_with_trace(
+            self.session,
+            europe_fulltext_xml_url=fulltext_url,
+            pmcid=arguments.get("pmcid"),
+            timeout=30,
         )
-        if resp.status_code != 200:
+        content = fetch.get("content")
+        if not isinstance(content, str) or not content.strip():
             return {
                 "status": "error",
-                "error": f"Europe PMC fullTextXML fetch failed (HTTP {resp.status_code})",
-                "url": getattr(resp, "url", fulltext_url),
-                "status_code": resp.status_code,
-                "retryable": resp.status_code in (408, 429, 500, 502, 503, 504),
+                "error": "Full text fetch failed",
+                "url": fetch.get("url") or fulltext_url,
+                "status_code": fetch.get("status_code"),
+                "retryable": fetch.get("status_code") in (408, 429, 500, 502, 503, 504),
+                "retrieval_trace": fetch.get("trace") or [],
             }
 
         try:
-            text = self._extract_text(resp.text or "")
+            if fetch.get("format") == "xml":
+                text = self._extract_text(content)
+            else:
+                text = _extract_text_from_html(content)
         except ET.ParseError:
             return {
                 "status": "error",
-                "error": "Europe PMC fullTextXML returned invalid XML",
-                "url": getattr(resp, "url", fulltext_url),
+                "error": "Full text returned invalid XML",
+                "url": fetch.get("url") or fulltext_url,
                 "retryable": True,
+                "retrieval_trace": fetch.get("trace") or [],
             }
 
         snippets = []
@@ -548,10 +918,167 @@ class EuropePMCFullTextSnippetsTool(BaseTool):
 
         return {
             "status": "success",
-            "url": getattr(resp, "url", fulltext_url),
+            "url": fetch.get("url"),
+            "source": fetch.get("source"),
+            "format": fetch.get("format"),
+            "content_type": fetch.get("content_type"),
+            "retrieval_trace": fetch.get("trace") or [],
             "snippets": snippets,
             "snippets_count": len(snippets),
             "truncated": total_chars >= max_total_chars,
+        }
+
+
+@register_tool("EuropePMCFullTextFetchTool")
+class EuropePMCFullTextFetchTool(BaseTool):
+    """
+    Fetch full text content for a PMC article with deterministic fallbacks and
+    machine-readable provenance (retrieval_trace).
+
+    This tool is intended for machine consumption: it always returns a structured
+    status payload and, when successful, includes source/format/content_type.
+    """
+
+    def __init__(self, tool_config):
+        super().__init__(tool_config)
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/xml, text/xml;q=0.9, text/html;q=0.8, */*;q=0.7",
+                # NCBI/PMC frequently blocks the default python-requests UA.
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            }
+        )
+
+    def _build_fulltext_xml_url(self, arguments: dict) -> str | None:
+        fulltext_xml_url = arguments.get("fulltext_xml_url")
+        if isinstance(fulltext_xml_url, str) and fulltext_xml_url.strip():
+            return fulltext_xml_url.strip()
+
+        pmcid = arguments.get("pmcid")
+        if isinstance(pmcid, str) and pmcid.strip():
+            pmcid = pmcid.strip()
+            pmcid = pmcid if pmcid.upper().startswith("PMC") else f"PMC{pmcid}"
+            return (
+                f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
+            )
+
+        source_db = arguments.get("source_db") or arguments.get("source")
+        article_id = arguments.get("article_id")
+        if (
+            isinstance(source_db, str)
+            and source_db.strip()
+            and isinstance(article_id, str)
+            and article_id.strip()
+        ):
+            return f"https://www.ebi.ac.uk/europepmc/webservices/rest/{source_db.strip()}/{article_id.strip()}/fullTextXML"
+
+        return None
+
+    def run(self, arguments):
+        fulltext_url = self._build_fulltext_xml_url(arguments)
+        pmcid = arguments.get("pmcid")
+
+        output_format = arguments.get("output_format", "text")
+        if output_format not in ("text", "raw"):
+            output_format = "text"
+
+        include_raw = bool(arguments.get("include_raw", False))
+
+        try:
+            max_chars = int(arguments.get("max_chars", 200000))
+        except (TypeError, ValueError):
+            max_chars = 200000
+        max_chars = max(1000, min(max_chars, 2_000_000))
+
+        try:
+            max_raw_chars = int(arguments.get("max_raw_chars", 200000))
+        except (TypeError, ValueError):
+            max_raw_chars = 200000
+        max_raw_chars = max(1000, min(max_raw_chars, 2_000_000))
+
+        try:
+            timeout = int(arguments.get("timeout", 30))
+        except (TypeError, ValueError):
+            timeout = 30
+        timeout = max(5, min(timeout, 120))
+
+        if not fulltext_url and not isinstance(pmcid, str):
+            return {
+                "status": "error",
+                "error": "Provide `pmcid`, or `fulltext_xml_url`, or (`source_db` + `article_id`).",
+                "retryable": False,
+            }
+
+        fetch = _fetch_fulltext_with_trace(
+            self.session,
+            europe_fulltext_xml_url=fulltext_url,
+            pmcid=pmcid,
+            timeout=timeout,
+        )
+        content = fetch.get("content")
+        if not isinstance(content, str) or not content.strip():
+            return {
+                "status": "error",
+                "error": "Full text fetch failed",
+                "url": fetch.get("url") or fulltext_url,
+                "status_code": fetch.get("status_code"),
+                "retryable": fetch.get("status_code") in (408, 429, 500, 502, 503, 504),
+                "retrieval_trace": fetch.get("trace") or [],
+            }
+
+        raw_out = None
+        truncated_raw = False
+        if include_raw:
+            raw_out = content[:max_raw_chars]
+            truncated_raw = len(content) > max_raw_chars
+
+        if output_format == "raw":
+            return {
+                "status": "success",
+                "url": fetch.get("url"),
+                "source": fetch.get("source"),
+                "format": fetch.get("format"),
+                "content_type": fetch.get("content_type"),
+                "retrieval_trace": fetch.get("trace") or [],
+                "content": content[:max_chars],
+                "truncated": len(content) > max_chars,
+                "raw": raw_out,
+                "raw_truncated": truncated_raw if include_raw else None,
+            }
+
+        # output_format == "text"
+        try:
+            if fetch.get("format") == "xml":
+                root = ET.fromstring(content or "")
+                text = " ".join("".join(root.itertext()).split())
+            else:
+                text = _extract_text_from_html(content)
+        except ET.ParseError:
+            return {
+                "status": "error",
+                "error": "Full text returned invalid XML",
+                "url": fetch.get("url") or fulltext_url,
+                "retryable": True,
+                "retrieval_trace": fetch.get("trace") or [],
+            }
+
+        out_text = text[:max_chars]
+        return {
+            "status": "success",
+            "url": fetch.get("url"),
+            "source": fetch.get("source"),
+            "format": fetch.get("format"),
+            "content_type": fetch.get("content_type"),
+            "retrieval_trace": fetch.get("trace") or [],
+            "text": out_text,
+            "truncated": len(text) > max_chars,
+            "raw": raw_out,
+            "raw_truncated": truncated_raw if include_raw else None,
         }
 
 
