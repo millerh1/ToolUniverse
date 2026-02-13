@@ -345,6 +345,12 @@ default_tool_files = {
     "proteinsplus": os.path.join(current_dir, "data", "proteinsplus_tools.json"),
     # SwissDock - Molecular docking with AutoDock Vina and Attracting Cavities
     "swissdock": os.path.join(current_dir, "data", "swissdock_tools.json"),
+    # LIPID MAPS - Lipid Structure Database (lipidomics)
+    "lipidmaps": os.path.join(current_dir, "data", "lipidmaps_tools.json"),
+    # USDA FoodData Central - Food composition and nutrient database
+    "fooddata_central": os.path.join(
+        current_dir, "data", "fooddata_central_tools.json"
+    ),
 }
 
 # Auto-load any user-provided tools from ~/.tooluniverse/user_tools/

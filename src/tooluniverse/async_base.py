@@ -4,6 +4,7 @@ Base classes for async tool development.
 Provides simplified base classes that handle common patterns like job polling,
 progress reporting, and error handling automatically.
 """
+
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
@@ -150,9 +151,7 @@ class AsyncPollingTool(ABC):
         return {"data": {"result": result}}
 
     async def run(
-        self,
-        arguments: Dict[str, Any],
-        progress: Optional[TaskProgress] = None
+        self, arguments: Dict[str, Any], progress: Optional[TaskProgress] = None
     ) -> Dict[str, Any]:
         """
         Execute tool asynchronously (automatically implemented!).
@@ -183,7 +182,9 @@ class AsyncPollingTool(ABC):
             job_id = self.submit_job(arguments)
 
             if progress:
-                await progress.set_message(f"Job {job_id} submitted, waiting for completion...")
+                await progress.set_message(
+                    f"Job {job_id} submitted, waiting for completion..."
+                )
 
             # Step 2: Poll until complete
             result = await self._poll_until_complete(job_id, progress)
@@ -195,9 +196,7 @@ class AsyncPollingTool(ABC):
             return self.handle_error(e)
 
     async def _poll_until_complete(
-        self,
-        job_id: str,
-        progress: Optional[TaskProgress]
+        self, job_id: str, progress: Optional[TaskProgress]
     ) -> Any:
         """
         Poll job status until complete (internal implementation).
@@ -256,14 +255,14 @@ class AsyncPollingTool(ABC):
                     "properties": {
                         "data": {
                             "type": "object",
-                            "description": "Successful result data"
+                            "description": "Successful result data",
                         },
                         "metadata": {
                             "type": "object",
-                            "description": "Optional metadata"
-                        }
+                            "description": "Optional metadata",
+                        },
                     },
-                    "required": ["data"]
+                    "required": ["data"],
                 },
                 {
                     "type": "object",
@@ -273,13 +272,13 @@ class AsyncPollingTool(ABC):
                             "properties": {
                                 "message": {"type": "string"},
                                 "error_type": {"type": "string"},
-                                "details": {"type": "object"}
+                                "details": {"type": "object"},
                             },
-                            "required": ["message", "error_type"]
+                            "required": ["message", "error_type"],
                         }
                     },
-                    "required": ["error"]
-                }
+                    "required": ["error"],
+                },
             ]
         }
 
@@ -311,10 +310,7 @@ class AsyncPollingTool(ABC):
             "error": {
                 "message": str(exception),
                 "error_type": type(exception).__name__,
-                "details": {
-                    "exception_class": exception.__class__.__name__,
-                    "tool": self.name
-                }
+                "details": {"tool": self.name},
             }
         }
 
@@ -403,9 +399,7 @@ class AsyncStreamingTool(ABC):
         pass
 
     async def run(
-        self,
-        arguments: Dict[str, Any],
-        progress: Optional[TaskProgress] = None
+        self, arguments: Dict[str, Any], progress: Optional[TaskProgress] = None
     ) -> Dict[str, Any]:
         """Execute streaming tool (automatically implemented!)."""
         try:
@@ -431,7 +425,9 @@ class AsyncStreamingTool(ABC):
 
                 await asyncio.sleep(self.chunk_interval)
             else:
-                raise TimeoutError(f"Stream timed out after {self.max_duration} seconds")
+                raise TimeoutError(
+                    f"Stream timed out after {self.max_duration} seconds"
+                )
 
             return {"data": {"chunks": chunks, "total": len(chunks)}}
 
@@ -446,17 +442,15 @@ class AsyncStreamingTool(ABC):
                     "type": "object",
                     "properties": {
                         "data": {"type": "object"},
-                        "metadata": {"type": "object"}
+                        "metadata": {"type": "object"},
                     },
-                    "required": ["data"]
+                    "required": ["data"],
                 },
                 {
                     "type": "object",
-                    "properties": {
-                        "error": {"type": "object"}
-                    },
-                    "required": ["error"]
-                }
+                    "properties": {"error": {"type": "object"}},
+                    "required": ["error"],
+                },
             ]
         }
 
@@ -470,6 +464,6 @@ class AsyncStreamingTool(ABC):
             "error": {
                 "message": str(exception),
                 "error_type": type(exception).__name__,
-                "details": {"tool": self.name}
+                "details": {"tool": self.name},
             }
         }

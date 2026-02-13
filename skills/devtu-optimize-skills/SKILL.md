@@ -466,6 +466,359 @@ When reviewing a ToolUniverse skill, check:
 **Bad**: "Include PPIs" ✓ (but only 3 interactors listed)
 **Fix**: "≥20 PPIs OR explanation why fewer"
 
+### 13. Untested Tool Calls (CRITICAL - NEW)
+**Bad**: Skill created with excellent documentation but tools never actually called
+**Example**: Documentation shows `drugbank_get_drug_basic_info(drug_name_or_drugbank_id="...")` but parameter doesn't exist
+**Impact**: All 4 broken skills discovered in 2026-02 had this issue - 0% functionality despite 1,500+ line docs
+
+**Fix**: Test-driven skill development:
+1. Write test script FIRST: `test_[skill].py`
+2. Call every tool with real ToolUniverse instance
+3. Verify parameters work and results are correct
+4. Create working pipeline from tested code
+5. Write documentation from working examples
+
+**Verification**:
+```python
+# Test every tool before documenting
+def test_tools():
+    tu = ToolUniverse()
+    tu.load_tools()
+
+    # Test Tool 1
+    result = tu.tools.TOOL_NAME(param="value")
+    assert result.get('status') == 'success', "Tool 1 failed"
+
+    # Test Tool 2
+    result = tu.tools.TOOL_NAME2(param="value")
+    assert result.get('status') == 'success', "Tool 2 failed"
+```
+
+**Rule**: NEVER write skill documentation without first testing all tool calls.
+
+---
+
+## NEW: Implementation-Agnostic Skills (2026-02 Update)
+
+### Critical Lesson from Real Fixes
+
+**All 4 broken skills** (Drug-Drug Interaction, Clinical Trial Design, Antibody Engineering, CRISPR Screen Analysis) had excellent documentation but were never tested with real tool calls. This section documents critical lessons learned from fixing them.
+
+### 14. Implementation-Agnostic Documentation
+
+**Problem**: Skills written with implementation-specific code (Python SDK only) limit users to one interface. Users may access ToolUniverse via Python SDK, MCP (Model Context Protocol), or future APIs.
+
+**Solution**: Separate general concepts from implementation details.
+
+**File Structure**:
+```
+skills/[skill-name]/
+├── SKILL.md                     # General workflow (NO Python/MCP code)
+├── python_implementation.py     # Python SDK implementation
+├── QUICK_START.md              # Multi-implementation examples
+└── test_[skill].py             # Test script
+```
+
+**SKILL.md Format (General)**:
+```markdown
+## Phase 1: [Name]
+
+**Objective**: What this phase achieves
+
+**Tools needed**:
+- Tool_A: Purpose and what it does
+  - Input: parameter descriptions
+  - Output: expected results
+
+**Workflow**:
+1. Query Tool_A with [inputs]
+2. Extract [specific data]
+3. If no results → try Tool_B
+4. Continue with available data
+
+**Decision logic**:
+- When to use exact match vs fuzzy
+- How to handle empty results
+- When to trigger fallback
+```
+
+**Don't include in SKILL.md**:
+- ❌ `from tooluniverse import ToolUniverse`
+- ❌ `tu.tools.TOOL_NAME(...)`
+- ❌ Python-specific code
+- ❌ MCP-specific JSON
+
+**QUICK_START.md Format (Multi-Implementation)**:
+```markdown
+## Choose Your Implementation
+
+### Python SDK
+[Python code examples]
+
+### MCP (Model Context Protocol)
+[Conversational prompts + JSON tool calls]
+
+## Tool Parameters (All Implementations)
+[Parameter table noting: applies to both Python SDK and MCP]
+```
+
+**Why this matters**: Users can choose Python SDK, MCP, or future interfaces without relearning the skill workflow.
+
+### 15. SOAP Tools Special Handling
+
+**Problem**: SOAP-based tools (IMGT, SAbDab, TheraSAbDab) require a special `operation` parameter that isn't obvious from function names. Missing this causes 100% tool failure.
+
+**Detection**: If tool returns error "Parameter validation failed: 'operation' is a required property" → SOAP tool
+
+**Add to Tool Interface Verification (Section 1)**:
+
+| Tool Family | Parameter | CRITICAL Requirement |
+|-------------|-----------|---------------------|
+| IMGT_* | `operation` | MUST be first parameter (e.g., "search_genes") |
+| SAbDab_* | `operation` | MUST be first parameter (e.g., "search_structures") |
+| TheraSAbDab_* | `operation` | MUST be first parameter (e.g., "search_by_target") |
+
+**Example**:
+```markdown
+### Tool: IMGT_search_genes
+
+**Parameters** (implementation-agnostic):
+- `operation` (string, required): SOAP method name = "search_genes"
+- `gene_type` (string, required): "IGHV", "IGKV", "IGLV"
+- `species` (string, required): "Homo sapiens" for human
+
+**Python SDK**:
+```python
+result = tu.tools.IMGT_search_genes(
+    operation="search_genes",  # Required!
+    gene_type="IGHV",
+    species="Homo sapiens"
+)
+```
+
+**MCP**:
+```json
+{
+  "operation": "search_genes",
+  "gene_type": "IGHV",
+  "species": "Homo sapiens"
+}
+```
+
+**Critical**: SOAP tools will fail without `operation` parameter in both implementations.
+```
+
+### 16. Fallback Strategies for API Failures
+
+**Problem**: Primary APIs can go down completely (e.g., DepMap 404 errors). Skills without fallbacks become 0% functional.
+
+**Solution**: Implement tiered fallback strategies and document them clearly.
+
+**Fallback Pattern**:
+```markdown
+## Fallback Strategy
+
+**Primary**: [Best data source with detailed info]
+**Fallback**: [Alternative source with partial data]
+**Default**: [Continue with limited/unvalidated data]
+
+**Python SDK**:
+```python
+try:
+    result = tu.tools.PRIMARY_TOOL(param=value)
+except:
+    result = tu.tools.FALLBACK_TOOL(param=value)
+```
+
+**MCP**: Tell Claude to use Fallback if Primary unavailable
+```
+
+**Real Example from CRISPR Screen Analysis**:
+- **Primary**: DepMap_search_genes (comprehensive essentiality data)
+- **Fallback**: Pharos_get_target (TDL classification as essentiality proxy)
+- **Default**: Continue with unvalidated genes
+
+**Impact**: Skill went from 20% functional (total failure when DepMap down) to 60% functional (continues with Pharos data).
+
+---
+
+## Comprehensive Parameter Corrections (From Real Fixes)
+
+**Add to Section 1 (Tool Interface Verification)**:
+
+The following corrections were discovered while fixing 4 non-functional skills in February 2026:
+
+| Tool | Common Mistake | Correct Parameter | Evidence |
+|------|----------------|-------------------|----------|
+| RxNorm_get_drug_names | `query` | `drug_name` | DDI skill fix |
+| drugbank_get_drug_basic_info_by_drug_name_or_id | `drug_name_or_id` | `query` | DDI + Trial skill fixes |
+| drugbank_get_pharmacology_by_drug_name_or_drugbank_id | `drug_name_or_drugbank_id` | `query` | Trial skill fix |
+| drugbank_get_safety_by_drug_name_or_drugbank_id | `drug_name_or_drugbank_id` | `query` | Trial skill fix |
+| FAERS_count_reactions_by_drug_event | `drug_name` | `medicinalproduct` | DDI skill fix |
+| IMGT_search_genes | Missing parameter | `operation="search_genes"` | Antibody skill fix |
+| IMGT_get_sequence | Missing parameter | `operation="get_sequence"` | Antibody skill fix |
+| SAbDab_search_structures | Missing parameter | `operation="search_structures"` | Antibody skill fix |
+| TheraSAbDab_search_by_target | Missing parameter | `operation="search_by_target"` | Antibody skill fix |
+
+**Pattern**: Tool function names DO NOT predict parameter names - always test!
+
+---
+
+## Real-World Case Studies
+
+### Case Study 1: Drug-Drug Interaction Skill
+
+**Original State**: 0% functional
+- Documentation showed `drugbank_get_drug_basic_info(drug_name_or_drugbank_id="...")`
+- Tool actually requires `query` parameter
+- Never tested with real ToolUniverse instance
+- Beautiful 300+ line documentation, completely non-functional
+
+**Fixed State**: 100% functional
+- Created `test_ddi.py` - verified all tool parameters
+- Created `python_implementation.py` - working 8-step pipeline
+- Updated `QUICK_START.md` - both Python SDK and MCP examples
+- Tool parameter table documents correct names
+
+**Key Fixes**:
+```markdown
+| Tool | WRONG (in docs) | CORRECT (tested) |
+|------|-----------------|------------------|
+| RxNorm_get_drug_names | query | drug_name |
+| drugbank_* | drug_name_or_id | query |
+| FAERS_count_reactions | drug_name | medicinalproduct |
+```
+
+**Lesson**: Function names are misleading - `get_drug_basic_info_by_drug_name_or_id` actually takes `query`, not `drug_name_or_id`.
+
+### Case Study 2: Antibody Engineering Skill
+
+**Original State**: 0% functional
+- All SOAP tool calls missing `operation` parameter
+- Error: "Parameter validation failed: 'operation' is a required property"
+- 5/8 tools completely broken
+- Documentation looked professional but untested
+
+**Fixed State**: 80% functional
+- Identified SOAP tools (IMGT, SAbDab, TheraSAbDab)
+- Added `operation` parameter to all SOAP calls
+- Created side-by-side Python/MCP examples
+- Documented SOAP requirement prominently in QUICK_START
+
+**Key Fix**:
+```markdown
+## CRITICAL: SOAP Tools
+
+**Python SDK**:
+```python
+tu.tools.IMGT_search_genes(
+    operation="search_genes",  # Required!
+    gene_type="IGHV"
+)
+```
+
+**MCP**:
+```json
+{
+  "operation": "search_genes",
+  "gene_type": "IGHV"
+}
+```
+```
+
+**Lesson**: SOAP tools have special requirements not obvious from function signatures. Always test.
+
+### Case Study 3: CRISPR Screen Analysis Skill
+
+**Original State**: 20% functional
+- Primary API (DepMap) completely down (404 errors from both Sanger and Broad)
+- No fallback strategy
+- Skill failed completely when DepMap unavailable
+- Users got zero results despite many alternative tools available
+
+**Fixed State**: 60% functional
+- Implemented Pharos TDL fallback for gene validation
+- Documented fallback strategy in both Python SDK and MCP
+- TDL classification (Tclin/Tchem/Tbio/Tdark) as essentiality proxy
+- Skill continues with alternative data source
+
+**Key Fix**:
+```markdown
+## Fallback Strategy
+
+**Primary**: DepMap_search_genes (comprehensive essentiality data)
+**Fallback**: Pharos_get_target (TDL classification)
+**Default**: Continue with unvalidated genes
+
+**Python SDK**:
+```python
+try:
+    result = tu.tools.DepMap_search_genes(query=gene)
+except:
+    result = tu.tools.Pharos_get_target(gene=gene)
+    if result.get('status') == 'success':
+        tdl = result['data'].get('tdl', 'Unknown')
+```
+
+**MCP**: Tell Claude to use Pharos if DepMap unavailable
+```
+
+**Lesson**: External APIs fail. Always implement fallback chains for critical functionality.
+
+### Case Study 4: Clinical Trial Design Skill
+
+**Original State**: 0% functional
+- All DrugBank tool parameters wrong throughout entire skill
+- Assumed parameters based on function names
+- 6-step pipeline documented but never executed
+- Never tested end-to-end
+
+**Fixed State**: 100% functional
+- Corrected ALL DrugBank parameters (use `query`)
+- Created working 6-step feasibility analysis pipeline
+- Feasibility scoring (0-100) working correctly
+- Generated actual trial feasibility reports
+
+**Key Fixes**:
+- ALL DrugBank tools use `query` parameter, not the parameter names in their function names
+- Test revealed: `drugbank_get_safety_by_drug_name_or_drugbank_id(query="...", case_sensitive=False)`
+
+**Lesson**: Even when multiple tools have similar parameter name patterns in their function names, always verify each one.
+
+---
+
+## Updated Skill Release Checklist
+
+**Add to Skill Review Checklist section**:
+
+### Implementation & Testing
+- [ ] All tool calls tested in ToolUniverse instance (CRITICAL)
+- [ ] Test script passes (`test_[skill].py`)
+- [ ] Working pipeline runs without errors
+- [ ] 2-3 complete examples tested end-to-end
+- [ ] Error cases handled (empty data, API failures)
+- [ ] SOAP tools have `operation` parameter (if applicable)
+- [ ] Fallback strategies implemented and tested
+- [ ] Parameters verified via `get_tool_info()` or testing
+
+### Documentation
+- [ ] SKILL.md is implementation-agnostic (no Python/MCP code)
+- [ ] python_implementation.py contains working Python SDK code
+- [ ] QUICK_START.md includes both Python SDK and MCP examples
+- [ ] Tool parameter table notes "applies to all implementations"
+- [ ] SOAP tool warnings prominently displayed (if applicable)
+- [ ] Fallback strategies documented (if applicable)
+- [ ] Known limitations documented
+- [ ] Example reports generated
+
+### User Testing
+- [ ] Fresh terminal test passes (new user can follow docs)
+- [ ] Examples from QUICK_START work without modification
+- [ ] Reports are readable (not debug logs)
+- [ ] Completes in reasonable time (<5 min for basic examples)
+
+**CRITICAL**: Never release a skill without testing every single tool call with a real ToolUniverse instance. Documentation quality doesn't matter if tools don't work.
+
 ---
 
 ## Template: Optimized Skill Structure
@@ -544,14 +897,19 @@ Phase -1: Tool Verification → Phase 0: Foundation Data → Phase 1: Disambigua
 
 ## Summary
 
-**Seven pillars of optimized ToolUniverse skills**:
+**Ten pillars of optimized ToolUniverse skills** (updated 2026-02):
 
-1. **Verify tool contracts** - Check params via `get_tool_info()`; maintain corrections table
-2. **Foundation first** - Query comprehensive aggregators before specialized tools
-3. **Disambiguate carefully** - Resolve IDs (versioned + unversioned), detect collisions, get baseline from annotation DBs
-4. **Grade evidence** - T1-T4 tiers on all claims; summarize quality per section
-5. **Require quantified completeness** - Numeric minimums, not just "include X"
-6. **Report content, not process** - Methodology in appendix only if asked; aggregate gaps in one section
-7. **Synthesize** - Biological models and testable hypotheses, not just paper lists
+1. **TEST FIRST** - NEVER write skill documentation without testing all tool calls with real ToolUniverse instance
+2. **Verify tool contracts** - Check params via `get_tool_info()`; maintain corrections table; don't trust function names
+3. **Handle SOAP tools** - Add `operation` parameter to IMGT, SAbDab, TheraSAbDab tools
+4. **Implementation-agnostic docs** - SKILL.md general; separate python_implementation.py; QUICK_START for both SDK and MCP
+5. **Foundation first** - Query comprehensive aggregators before specialized tools
+6. **Disambiguate carefully** - Resolve IDs (versioned + unversioned), detect collisions, get baseline from annotation DBs
+7. **Implement fallbacks** - Primary → Fallback → Default chains for critical functionality
+8. **Grade evidence** - T1-T4 tiers on all claims; summarize quality per section
+9. **Require quantified completeness** - Numeric minimums, not just "include X"
+10. **Synthesize** - Biological models and testable hypotheses, not just paper lists
+
+**CRITICAL**: The #1 lesson from fixing 4 broken skills (Feb 2026): Test with real API calls BEFORE writing documentation. All had excellent docs but 0% functionality because tools were never tested.
 
 Apply these principles to any ToolUniverse research skill for better user experience and actionable output.

@@ -72,10 +72,9 @@ from .default_config import default_tool_files, get_default_hook_config
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Check if lazy loading is enabled (default: True for better performance)
-LAZY_LOADING_ENABLED = os.getenv("TOOLUNIVERSE_LAZY_LOADING", "true").lower() in (
-    "true",
-    "1",
-    "yes",
+_TRUTHY_VALUES = {"true", "1", "yes"}
+LAZY_LOADING_ENABLED = (
+    os.getenv("TOOLUNIVERSE_LAZY_LOADING", "true").lower() in _TRUTHY_VALUES
 )
 
 if LAZY_LOADING_ENABLED:
@@ -173,7 +172,11 @@ class ToolCallable:
         """Synchronous execution - handles both sync and async tools."""
         # Check if tool is async
         function_name = function_call.get("name")
-        tool_instance = self.engine._get_tool_instance(function_name, cache=True) if function_name else None
+        tool_instance = (
+            self.engine._get_tool_instance(function_name, cache=True)
+            if function_name
+            else None
+        )
 
         if tool_instance and inspect.iscoroutinefunction(tool_instance.run):
             # Async tool in sync context - use asyncio.run()
@@ -383,20 +386,19 @@ class ToolUniverse:
             self.logger.debug("Output hooks disabled")
 
         # Initialize caching configuration
-        cache_enabled = os.getenv("TOOLUNIVERSE_CACHE_ENABLED", "true").lower() in (
-            "true",
-            "1",
-            "yes",
+        cache_enabled = (
+            os.getenv("TOOLUNIVERSE_CACHE_ENABLED", "true").lower() in _TRUTHY_VALUES
         )
-        persistence_enabled = os.getenv(
-            "TOOLUNIVERSE_CACHE_PERSIST", "true"
-        ).lower() in ("true", "1", "yes")
+        persistence_enabled = (
+            os.getenv("TOOLUNIVERSE_CACHE_PERSIST", "true").lower() in _TRUTHY_VALUES
+        )
         memory_size = int(os.getenv("TOOLUNIVERSE_CACHE_MEMORY_SIZE", "256"))
         default_ttl_env = os.getenv("TOOLUNIVERSE_CACHE_DEFAULT_TTL")
         default_ttl = int(default_ttl_env) if default_ttl_env else None
-        singleflight_enabled = os.getenv(
-            "TOOLUNIVERSE_CACHE_SINGLEFLIGHT", "true"
-        ).lower() in ("true", "1", "yes")
+        singleflight_enabled = (
+            os.getenv("TOOLUNIVERSE_CACHE_SINGLEFLIGHT", "true").lower()
+            in _TRUTHY_VALUES
+        )
 
         cache_path = os.getenv("TOOLUNIVERSE_CACHE_PATH")
         if not cache_path and persistence_enabled:
@@ -415,15 +417,15 @@ class ToolUniverse:
             default_ttl=default_ttl,
         )
 
-        self._strict_validation = os.getenv(
-            "TOOLUNIVERSE_STRICT_VALIDATION", "false"
-        ).lower() in ("true", "1", "yes")
+        self._strict_validation = (
+            os.getenv("TOOLUNIVERSE_STRICT_VALIDATION", "false").lower()
+            in _TRUTHY_VALUES
+        )
 
-        # Initialize lenient type coercion feature
-        # Default: True for better user experience
-        self.lenient_type_coercion = os.getenv(
-            "TOOLUNIVERSE_COERCE_TYPES", "true"
-        ).lower() in ("true", "1", "yes")
+        # Lenient type coercion: auto-convert parameter types for better UX
+        self.lenient_type_coercion = (
+            os.getenv("TOOLUNIVERSE_COERCE_TYPES", "true").lower() in _TRUTHY_VALUES
+        )
 
         # Initialize dynamic tools namespace
         self.tools = ToolNamespace(self)
@@ -2241,12 +2243,18 @@ class ToolUniverse:
             )
             if not return_message:
                 return batch_results
-            return self._format_batch_as_messages(batch_results, function_call_json, message)
+            return self._format_batch_as_messages(
+                batch_results, function_call_json, message
+            )
 
         # Single execution - check if tool is async
         function_name = function_call_json.get("name", "")
         function_name = self._resolve_tool_name(function_name)
-        tool_instance = self._get_tool_instance(function_name, cache=True) if function_name else None
+        tool_instance = (
+            self._get_tool_instance(function_name, cache=True)
+            if function_name
+            else None
+        )
 
         if tool_instance and inspect.iscoroutinefunction(tool_instance.run):
             self.logger.debug(f"Running async tool '{function_name}' in sync context")
@@ -2281,9 +2289,7 @@ class ToolUniverse:
             call_results.append(
                 {
                     "role": "tool",
-                    "content": json.dumps(
-                        {"content": call_result, "call_id": call_id}
-                    ),
+                    "content": json.dumps({"content": call_result, "call_id": call_id}),
                 }
             )
         return [
@@ -2330,7 +2336,9 @@ class ToolUniverse:
             )
             if not return_message:
                 return batch_results
-            return self._format_batch_as_messages(batch_results, function_call_json, message)
+            return self._format_batch_as_messages(
+                batch_results, function_call_json, message
+            )
 
         return await self.run_one_function_async(
             function_call_json,
@@ -2365,8 +2373,12 @@ class ToolUniverse:
             if isinstance(result, Exception):
                 function_name = function_call_list[idx].get("name", "unknown")
                 arguments = function_call_list[idx].get("arguments", {})
-                classified_error = self._classify_exception(result, function_name, arguments)
-                processed_results.append(self._create_dual_format_error(classified_error))
+                classified_error = self._classify_exception(
+                    result, function_name, arguments
+                )
+                processed_results.append(
+                    self._create_dual_format_error(classified_error)
+                )
             else:
                 processed_results.append(result)
 
@@ -2814,7 +2826,7 @@ class ToolUniverse:
 
     async def _invoke_tool_async(self, tool_instance, tool_arguments, **kwargs):
         """Invoke tool.run, using await for async tools or a thread pool for sync tools."""
-        tool_name = getattr(tool_instance, 'name', 'unknown')
+        tool_name = getattr(tool_instance, "name", "unknown")
         if inspect.iscoroutinefunction(tool_instance.run):
             self.logger.debug(f"Executing async tool: {tool_name}")
             return await tool_instance.run(tool_arguments, **kwargs)
@@ -2837,7 +2849,11 @@ class ToolUniverse:
 
         if isinstance(arguments, dict):
             tool_arguments = dict(arguments)
-            if stream_callback and stream_flag_key and stream_flag_key not in tool_arguments:
+            if (
+                stream_callback
+                and stream_flag_key
+                and stream_flag_key not in tool_arguments
+            ):
                 tool_arguments[stream_flag_key] = True
 
         try:
@@ -2852,7 +2868,9 @@ class ToolUniverse:
             if "validate" in params:
                 kwargs["validate"] = validate
 
-            result = await self._invoke_tool_async(tool_instance, tool_arguments, **kwargs)
+            result = await self._invoke_tool_async(
+                tool_instance, tool_arguments, **kwargs
+            )
             return result, tool_arguments
 
         except (ValueError, TypeError) as e:

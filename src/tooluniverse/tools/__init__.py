@@ -1,7 +1,7 @@
 """
 ToolUniverse Tools
 
-Type-safe Python interface to 1265 scientific tools.
+Type-safe Python interface to 1269 scientific tools.
 Each tool is in its own module for minimal import overhead.
 
 Usage:
@@ -616,6 +616,8 @@ from .FDA_retrieve_patient_medication_info_by_drug_name import (
 )
 from .Fatcat_search_scholar import Fatcat_search_scholar
 from .Finish import Finish
+from .FoodDataCentral_get_food import FoodDataCentral_get_food
+from .FoodDataCentral_search_foods import FoodDataCentral_search_foods
 from .FourDN_get_download_url import FourDN_get_download_url
 from .FourDN_get_experiment_metadata import FourDN_get_experiment_metadata
 from .FourDN_get_file_metadata import FourDN_get_file_metadata
@@ -716,6 +718,9 @@ from .LOINC_get_code_details import LOINC_get_code_details
 from .LOINC_search_forms import LOINC_search_forms
 from .LOINC_search_tests import LOINC_search_tests
 from .LabelGenerator import LabelGenerator
+from .LipidMaps_get_compound_by_id import LipidMaps_get_compound_by_id
+from .LipidMaps_search_by_formula import LipidMaps_search_by_formula
+from .LipidMaps_search_by_name import LipidMaps_search_by_name
 from .LiteratureContextReviewer import LiteratureContextReviewer
 from .LiteratureSearchTool import LiteratureSearchTool
 from .LiteratureSynthesisAgent import LiteratureSynthesisAgent
@@ -1615,7 +1620,6 @@ from .get_xarray_info import get_xarray_info
 from .get_xesmf_info import get_xesmf_info
 from .get_xgboost_info import get_xgboost_info
 from .get_zarr_info import get_zarr_info
-from .ghost_tool import ghost_tool
 from .gnomad_get_gene import gnomad_get_gene
 from .gnomad_get_gene_constraints import gnomad_get_gene_constraints
 from .gnomad_get_region import gnomad_get_region
@@ -2123,6 +2127,8 @@ __all__ = [
     "FDA_retrieve_patient_medication_info_by_drug_name",
     "Fatcat_search_scholar",
     "Finish",
+    "FoodDataCentral_get_food",
+    "FoodDataCentral_search_foods",
     "FourDN_get_download_url",
     "FourDN_get_experiment_metadata",
     "FourDN_get_file_metadata",
@@ -2213,6 +2219,9 @@ __all__ = [
     "LOINC_search_forms",
     "LOINC_search_tests",
     "LabelGenerator",
+    "LipidMaps_get_compound_by_id",
+    "LipidMaps_search_by_formula",
+    "LipidMaps_search_by_name",
     "LiteratureContextReviewer",
     "LiteratureSearchTool",
     "LiteratureSynthesisAgent",
@@ -2892,7 +2901,6 @@ __all__ = [
     "get_xesmf_info",
     "get_xgboost_info",
     "get_zarr_info",
-    "ghost_tool",
     "gnomad_get_gene",
     "gnomad_get_gene_constraints",
     "gnomad_get_region",

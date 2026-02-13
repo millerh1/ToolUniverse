@@ -13,7 +13,7 @@ import inspect
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 from .task_progress import TaskProgress
 from .logging_config import get_logger
 
@@ -83,7 +83,8 @@ class TaskManager:
 
         async with self.lock:
             running_tasks = [
-                task for task in self.tasks.values()
+                task
+                for task in self.tasks.values()
                 if task.status == "working" and task._task_handle
             ]
             for task in running_tasks:
@@ -227,7 +228,10 @@ class TaskManager:
             return self._task_to_status_dict(task)
 
     async def get_result(
-        self, task_id: str, auth_context: Optional[str] = None, timeout: Optional[float] = None
+        self,
+        task_id: str,
+        auth_context: Optional[str] = None,
+        timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Block until the task reaches a terminal state and return its result.
@@ -253,7 +257,9 @@ class TaskManager:
             if timeout:
                 elapsed = (datetime.now() - start_time).total_seconds()
                 if elapsed > timeout:
-                    raise TimeoutError(f"Task {task_id} did not complete within {timeout}s")
+                    raise TimeoutError(
+                        f"Task {task_id} did not complete within {timeout}s"
+                    )
 
             await asyncio.sleep(0.5)
 
@@ -263,7 +269,8 @@ class TaskManager:
         """List tasks, optionally filtered by auth context. Newest first."""
         async with self.lock:
             tasks_list = [
-                task for task in self.tasks.values()
+                task
+                for task in self.tasks.values()
                 if not auth_context or task.auth_context == auth_context
             ]
             tasks_list.sort(key=lambda t: t.created_at, reverse=True)
