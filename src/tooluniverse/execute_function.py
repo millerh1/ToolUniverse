@@ -852,6 +852,14 @@ class ToolUniverse:
                 cat for cat in tool_type if cat not in exclude_categories_set
             ]
 
+        # Track existing tools before loading new ones (for merge mode)
+        # When include_tools is specified, we preserve previously loaded tools
+        existing_tool_names = (
+            {t.get("name") for t in self.all_tools if isinstance(t, dict)}
+            if include_tools_set
+            else None
+        )
+
         # Load tools from specified categories
         for each in categories_to_load:
             if each in all_tool_files:
@@ -891,9 +899,19 @@ class ToolUniverse:
                         f"Loaded {len(loaded_tool_list)} tools from category '{each}'"
                     )
                 except Exception as e:
-                    self.logger.error(
-                        f"Error loading tools from category '{each}': {e}"
-                    )
+                    # Optional tool files (FileNotFoundError) should not be treated as errors
+                    error_msg = str(e)
+                    if "No such file or directory" in error_msg or isinstance(
+                        e, FileNotFoundError
+                    ):
+                        self.logger.debug(
+                            f"Optional tool category '{each}' not found: {all_tool_files.get(each)}"
+                        )
+                    else:
+                        # Real errors (parsing, permissions, etc.) should still be logged
+                        self.logger.error(
+                            f"Error loading tools from category '{each}': {e}"
+                        )
             else:
                 self.logger.warning(
                     f"Tool category '{each}' not found in available tool files"
@@ -908,6 +926,7 @@ class ToolUniverse:
             include_tools_set,
             include_tool_types_set,
             exclude_tool_types_set,
+            existing_tool_names,
         )
 
         # Process MCP Auto Loader tools
@@ -953,6 +972,7 @@ class ToolUniverse:
         include_tools_set,
         include_tool_types_set=None,
         exclude_tool_types_set=None,
+        existing_tool_names=None,
     ):
         """
         Filter tools based on inclusion/exclusion criteria and remove duplicates.
@@ -962,6 +982,9 @@ class ToolUniverse:
             include_tools_set (set or None): Set of tool names to include (if None, include all)
             include_tool_types_set (set or None): Set of tool types to include (if None, include all)
             exclude_tool_types_set (set or None): Set of tool types to exclude (if None, exclude none)
+            existing_tool_names (set or None): Set of tool names that were already loaded before this call.
+                                               These tools will be preserved even if not in include_tools_set.
+                                               Used for merge mode when loading specific tools.
         """
         tool_name_list = []
         dedup_all_tools = []
@@ -998,6 +1021,25 @@ class ToolUniverse:
                 self.logger.debug(
                     f"Excluding tool '{tool_name}' - type '{tool_type}' is excluded"
                 )
+                continue
+
+            # Preserve existing tools (merge mode)
+            # If this tool was already loaded before this call, keep it regardless of filters
+            if existing_tool_names and tool_name in existing_tool_names:
+                # Skip excluded tools even if previously loaded
+                if tool_name in exclude_tools_set:
+                    excluded_tools_count += 1
+                    self.logger.debug(
+                        f"Excluding previously loaded tool by name: {tool_name}"
+                    )
+                    continue
+
+                # Keep this existing tool
+                if tool_name not in tool_name_list:
+                    tool_name_list.append(tool_name)
+                    dedup_all_tools.append(each)
+                else:
+                    duplicate_names.add(tool_name)
                 continue
 
             # If include_tools_set is specified, only include tools in that set
@@ -3316,6 +3358,50 @@ class ToolUniverse:
         if self.cache_manager:
             self.cache_manager.clear()
         self.logger.info("Result cache cleared")
+
+    def clear_tools(self, clear_cache=False):
+        """
+        Clear all loaded tools from the registry.
+
+        This method resets the tool registry to its initial empty state, allowing you to:
+        - Free memory after loading many tools
+        - Reset state between different workflows
+        - Load a fresh set of tools for a new context
+        - Control which tools are visible to tool finder
+
+        Args:
+            clear_cache (bool, optional): Whether to also clear the result cache.
+                                         Defaults to False.
+
+        Examples:
+            # Clear tools but keep cached results
+            tu.clear_tools()
+
+            # Clear both tools and cached results
+            tu.clear_tools(clear_cache=True)
+
+            # Load specific tools after clearing
+            tu.clear_tools()
+            tu.load_tools(include_tools=["UniProt_get_entry_by_accession"])
+
+        Note:
+            - This does not affect tool instances in callable_functions cache
+            - Subsequent tool access will trigger on-demand loading
+            - Use clear_cache=True if you also want to clear result cache
+        """
+        # Clear tool registry
+        self.all_tools = []
+        self.all_tool_dict = {}
+        self.tool_category_dicts = {}
+
+        # Clear instantiated tool instances
+        self.callable_functions = {}
+
+        self.logger.info("Tool registry cleared")
+
+        # Optionally clear result cache
+        if clear_cache:
+            self.clear_cache()
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Return cache statistics."""
