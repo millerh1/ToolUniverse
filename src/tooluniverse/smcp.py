@@ -1624,6 +1624,7 @@ class SMCP(FastMCP):
                 """Execute ToolUniverse tool with provided arguments."""
                 import json
 
+                stream_callback = None
                 try:
                     # Remove ctx if present (legacy support)
                     ctx = kwargs.pop("ctx", None) if "ctx" in kwargs else None
@@ -1700,9 +1701,6 @@ class SMCP(FastMCP):
                         loop = asyncio.get_running_loop()
                     except RuntimeError:
                         loop = asyncio.get_event_loop()
-
-                    # Initialize stream_callback to None by default
-                    stream_callback = None
 
                     if stream_flag and ctx is not None:
 
