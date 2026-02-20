@@ -50,6 +50,8 @@ uv pip install tooluniverse
 
 > **Guided Setup:** Install skills first with `npx skills add mims-harvard/ToolUniverse`, then ask your AI coding agent **"setup tooluniverse"**. The `setup-tooluniverse` skill will walk you through MCP configuration, API keys, and validation step by step.
 
+> **Ask Research Questions:** Once set up, use the `tooluniverse` skill as a router to run research queries — e.g. *"Use the tooluniverse skill: what are the known drug targets for Alzheimer's disease?"* It will select the right specialized skill and tools for your question.
+
 - **[Python Developer Guide](https://zitniklab.hms.harvard.edu/ToolUniverse/guide/python_guide.html)**: Build AI scientists with the Python SDK
 - **[AI Agent Platforms](https://zitniklab.hms.harvard.edu/ToolUniverse/guide/building_ai_scientists/index.html)**: Set up ToolUniverse with Cursor, Claude, Windsurf, Gemini, and more
 

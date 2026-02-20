@@ -627,6 +627,14 @@ default_tool_files = {
     "pfam": os.path.join(current_dir, "data", "pfam_tools.json"),
     # PubChem Toxicity - Chemical toxicity, GHS hazard, carcinogen classification, LD50 data
     "pubchem_tox": os.path.join(current_dir, "data", "pubchem_tox_tools.json"),
+    # Catalogue of Life - Global species index (2M+ species from 165+ databases)
+    "col": os.path.join(current_dir, "data", "col_tools.json"),
+    # LOTUS - Natural products database (750K+ structure-organism pairs)
+    "lotus": os.path.join(current_dir, "data", "lotus_tools.json"),
+    # MSigDB - Molecular Signatures Database (33K+ gene sets for GSEA)
+    "msigdb": os.path.join(current_dir, "data", "msigdb_tools.json"),
+    # HumanMine - InterMine data warehouse for human/mouse/rat genomics
+    "humanmine": os.path.join(current_dir, "data", "humanmine_tools.json"),
 }
 
 # Auto-load any user-provided tools from ~/.tooluniverse/user_tools/
