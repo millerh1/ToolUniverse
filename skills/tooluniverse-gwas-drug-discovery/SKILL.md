@@ -1,18 +1,6 @@
 ---
 name: tooluniverse-gwas-drug-discovery
-version: 1.0.0
-description: Discover druggable targets and repurposing opportunities from GWAS data
-tags:
-  - gwas
-  - drug-discovery
-  - genetics
-  - precision-medicine
-  - target-identification
-  - drug-repurposing
-authors:
-  - ToolUniverse Team
-created: 2026-02-13
-updated: 2026-02-13
+description: Transform GWAS signals into actionable drug targets and repurposing opportunities. Performs locus-to-gene mapping, target druggability assessment, existing drug identification, safety profile evaluation, and clinical trial matching. Use when discovering drug targets from GWAS data, finding drug repurposing opportunities from genetic associations, or translating GWAS findings into therapeutic leads.
 ---
 
 # GWAS-to-Drug Target Discovery

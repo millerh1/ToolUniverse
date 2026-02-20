@@ -1,7 +1,6 @@
 ---
-name: Metabolomics Research
-description: |
-  Comprehensive metabolomics research skill for identifying metabolites, analyzing studies, and searching metabolomics databases. Use this skill when asked to: (1) Identify or annotate metabolites from HMDB or PubChem (HMDB IDs, chemical properties, pathways), (2) Retrieve metabolomics study information from MetaboLights (MTBLS*) or Metabolomics Workbench (ST*), (3) Search for studies by keywords/disease, (4) Analyze metabolite profiles or datasets, (5) Generate comprehensive metabolomics research reports. Integrates HMDB (220k+ metabolites), MetaboLights (public repository), Metabolomics Workbench (NIH data), and PubChem (chemical properties).
+name: tooluniverse-metabolomics
+description: Comprehensive metabolomics research skill for identifying metabolites, analyzing studies, and searching metabolomics databases. Integrates HMDB (220k+ metabolites), MetaboLights, Metabolomics Workbench, and PubChem. Use when asked to identify or annotate metabolites (HMDB IDs, chemical properties, pathways), retrieve metabolomics study information from MetaboLights (MTBLS*) or Metabolomics Workbench (ST*), search for studies by keywords or disease, or generate comprehensive metabolomics research reports.
 ---
 
 # Metabolomics Research
