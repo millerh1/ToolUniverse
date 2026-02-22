@@ -356,7 +356,7 @@ Connection timeouts
 
    .. code-block:: python
 
-      tu = ToolUniverse(timeout=30)  # 30 second timeout
+      tu = ToolUniverse()  # timeout is configured per-tool at the HTTP request level
 
 2. **Check network connection:**
 

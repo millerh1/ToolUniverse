@@ -49,15 +49,15 @@ Setup Steps
       :animate: fade-in-slide-down
       :color: info
 
-      If you installed with pip instead of using uvx:
+      If you installed with ``pip install tooluniverse`` instead of using uvx:
 
       .. code-block:: json
 
          {
            "mcpServers": {
              "tooluniverse": {
-               "command": "python",
-               "args": ["-m", "tooluniverse.mcp_integration.smcp_stdio"],
+               "command": "tooluniverse",
+               "args": [],
                "env": {"PYTHONIOENCODING": "utf-8"}
              }
            }

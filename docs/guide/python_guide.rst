@@ -348,12 +348,14 @@ Multi-Step Pipeline
    })
 
    # Step 3: For each target, get protein info
-   for target in targets[:3]:  # First 3 targets
+   rows = targets['data']['disease']['associatedTargets']['rows']
+   for row in rows[:3]:  # First 3 targets
+       target = row['target']
        protein_info = tu.run({
            "name": "UniProt_get_entry_by_accession",
-           "arguments": {"accession": target.get("target_id")}
+           "arguments": {"accession": target.get("id")}
        })
-       print(f"Target: {target.get('target_name')}")
+       print(f"Target: {target.get('approvedSymbol')}")
        print(f"Protein: {protein_info}")
 
 Batch Execution
@@ -426,8 +428,8 @@ Tool Loading Options
    # Load specific categories
    tu.load_tools(tool_type=['uniprot', 'ChEMBL', 'opentarget'])
 
-   # Load with custom cache
-   tu.load_tools(use_cache=True, cache_dir="./custom_cache")
+   # Load only specific tools by name
+   tu.load_tools(include_tools=['UniProt_get_function_by_accession', 'PubMed_search_articles'])
 
 Logging
 ~~~~~~~

@@ -1,33 +1,9 @@
 ChatGPT API Setup
 =================
 
-**Build AI scientists with ChatGPT Function Calling in 15 minutes**
-
-Overview
---------
+**Build AI scientists with ChatGPT Function Calling**
 
 ChatGPT API integration enables programmatic scientific research through OpenAI's function calling capabilities with ToolUniverse's 1000+ tools.
-
-.. grid:: 1 1 3 3
-   :gutter: 2
-
-   .. grid-item-card:: ⚡ Setup Time
-      :class-card: hover-lift
-      :shadow: sm
-      
-      **15 minutes**
-
-   .. grid-item-card:: 💻 Difficulty
-      :class-card: hover-lift
-      :shadow: sm
-      
-      **Advanced**
-
-   .. grid-item-card:: 🎯 Best For
-      :class-card: hover-lift
-      :shadow: sm
-      
-      **Automation & APIs**
 
 Prerequisites
 -------------
