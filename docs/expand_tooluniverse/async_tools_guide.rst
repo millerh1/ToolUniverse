@@ -383,7 +383,7 @@ Automatic Progress
 
 The base class automatically reports progress through the ``TaskProgress`` system:
 
-.. code-block:: python
+.. code-block:: text
 
    # Your check_status returns progress percentage:
    return {"done": False, "progress": 45}

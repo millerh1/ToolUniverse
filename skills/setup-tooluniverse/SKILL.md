@@ -33,10 +33,18 @@ Guide the user step-by-step through setting up ToolUniverse with MCP (Model Cont
 Start by welcoming the user. Then immediately run these detection commands **before asking any questions**:
 
 ```bash
-# Detect installed client by checking config file presence
+# Detect OS first
+echo "=== Detecting OS ===" && \
+  ([ "$(uname)" = "Darwin" ] && echo "OS: macOS") || \
+  ([ "$(uname)" = "Linux" ] && echo "OS: Linux") || \
+  ([ -n "$WINDIR" ] || [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "win32" ]) && echo "OS: Windows" || \
+  echo "OS: Unknown"
+
+# Detect installed client by checking config file presence (macOS/Linux paths)
 echo "=== Detecting your AI client ===" && \
   ([ -f ~/.cursor/mcp.json ] && echo "✅ Cursor detected") || true && \
-  ([ -f ~/Library/Application\ Support/Claude/claude_desktop_config.json ] && echo "✅ Claude Desktop detected") || true && \
+  ([ -f ~/Library/Application\ Support/Claude/claude_desktop_config.json ] && echo "✅ Claude Desktop detected (macOS)") || true && \
+  ([ -f ~/.config/Claude/claude_desktop_config.json ] && echo "✅ Claude Desktop detected (Linux)") || true && \
   ([ -f ~/.claude.json ] && echo "✅ Claude Code detected") || true && \
   ([ -f ~/.codeium/windsurf/mcp_config.json ] && echo "✅ Windsurf detected") || true && \
   ([ -f ~/.gemini/settings.json ] && echo "✅ Gemini CLI detected") || true && \
@@ -45,6 +53,13 @@ echo "=== Detecting your AI client ===" && \
   ([ -f opencode.json ] && echo "✅ OpenCode detected") || true && \
   echo "=== Detection complete ==="
 ```
+
+**On Windows**, the detection commands above won't run in bash. Instead ask the user to check these paths manually:
+- Claude Desktop: `%APPDATA%\Claude\claude_desktop_config.json`
+- Cursor: `%USERPROFILE%\.cursor\mcp.json`
+- Claude Code: `%USERPROFILE%\.claude.json`
+
+**Remember the detected OS** — it changes the config file paths, the uv install command, and the log file locations used in later steps.
 
 Based on results:
 - **One client detected**: Tell the user "I can see you're using [Client]. I'll set up ToolUniverse for that." Skip Question 1.
@@ -110,21 +125,50 @@ which uv && uv --version || echo "NOT_INSTALLED"
 ```
 
 - **If uv is found**: Say "✅ uv is already installed (version X.X.X) — skipping this step." and go straight to Step 2.
-- **If NOT_INSTALLED**: Explain that `uv` is a fast package manager that makes MCP setup simple, then install it:
+- **If NOT_INSTALLED**: Explain that `uv` is a fast package manager that makes MCP setup simple, then install it.
 
+**On macOS — recommend Homebrew if available** (it places `uvx` in a system path that GUI apps like Claude Desktop can find):
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh && source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null
+# Check if Homebrew is available
+which brew && echo "Homebrew found" || echo "No Homebrew"
+```
+- **Homebrew found → use it** (preferred for Claude Desktop users):
+  ```bash
+  brew install uv
+  ```
+- **No Homebrew → use the installer script**:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Source the env file the installer creates (activates uv in the current shell without reopening):
+  source "$HOME/.local/bin/env" 2>/dev/null || source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null
+  ```
 
-# Windows (PowerShell)
+**On Linux:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source "$HOME/.local/bin/env" 2>/dev/null || source ~/.bashrc 2>/dev/null
+```
+
+**On Windows (PowerShell):**
+```powershell
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Then close and reopen PowerShell to refresh PATH
 ```
 
 Verify it worked: `uvx --version` — if this prints a version number, move on.
 
 ### Step 2: Add ToolUniverse to your MCP config
 
-**First, check if the config file already exists:**
+**First, validate that `uvx tooluniverse` actually works before touching any config:**
+
+```bash
+uvx tooluniverse --help
+```
+
+- **Prints usage text** → proceed. The package is available and runnable.
+- **Error / not found** → stop and fix the uv install (Issue 5 below) before writing the config. Writing a config that points to a broken command is harder to debug later.
+
+**Then, check if the config file already exists:**
 
 ```bash
 # Replace <CONFIG_PATH> with the path for the detected client (see table below)
@@ -133,11 +177,39 @@ cat <CONFIG_PATH> 2>/dev/null || echo "CONFIG_NOT_FOUND"
 
 - **CONFIG_NOT_FOUND**: Create the file with the config below — proceed normally.
 - **File exists but no `tooluniverse` entry**: Say "I see you already have an MCP config. I'll add ToolUniverse to it." Merge the `tooluniverse` block into the existing `mcpServers` object.
-- **File exists and already has `tooluniverse`**: Ask "ToolUniverse is already configured. Skip this step, or overwrite with the latest config?"
+- **File exists and already has `tooluniverse`**: Say "ToolUniverse is already configured here. I'll skip rewriting it to avoid overwriting any API keys you may have added." Only offer to overwrite if the user explicitly asks — silently replacing their config could delete customized `env` keys.
 
 ---
 
 Now we'll add ToolUniverse to your app's MCP configuration. Based on the client the user chose in Step 0, help them find and edit the right config file. All clients use the same server config -- only the file location differs.
+
+#### ⚠️ Claude Desktop only: Fix uvx PATH first
+
+Claude Desktop is a GUI app — it does **not** inherit your shell's PATH. If `uvx` is in `~/.local/bin` (the default for the uv installer), Claude Desktop won't find it and will show "Failed to spawn" / "ENOENT" errors. Fix this **before** writing the config. Present all three options and let the user choose:
+
+**Option A — Homebrew (macOS, recommended — permanent fix):**
+```bash
+brew install uv
+```
+Homebrew places `uvx` at `/opt/homebrew/bin/uvx` (Apple Silicon) or `/usr/local/bin/uvx` (Intel), which Claude Desktop can always find. After this, `"command": "uvx"` works everywhere with no absolute path.
+
+**Option B — Symlink (macOS/Linux — permanent fix):**
+```bash
+# Apple Silicon Mac
+sudo ln -sf "$(which uvx)" /opt/homebrew/bin/uvx
+# Intel Mac / Linux
+sudo ln -sf "$(which uvx)" /usr/local/bin/uvx
+```
+After this, `"command": "uvx"` works everywhere with no absolute path.
+
+**Option C — Absolute path (all platforms — quick fix, no sudo needed):**
+```bash
+which uvx   # macOS/Linux → shows e.g. /opt/homebrew/bin/uvx or /Users/you/.local/bin/uvx
+where uvx   # Windows
+```
+Use that full path as the `"command"` value in the config below instead of `"uvx"`.
+
+Common paths: macOS Homebrew (Apple Silicon) `/opt/homebrew/bin/uvx` · Intel Mac `/usr/local/bin/uvx` · uv installer `~/.local/bin/uvx` · Windows `C:\Users\yourname\.local\bin\uvx.exe`
 
 #### MCP Server Configuration (same for all clients)
 
@@ -178,7 +250,7 @@ Now we'll add ToolUniverse to your app's MCP configuration. Based on the client 
 | Client | Config File (macOS) | How to Access |
 |--------|-------------------|---------------|
 | **Cursor** | `~/.cursor/mcp.json` | Settings → MCP → Add new global MCP server |
-| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` | Settings → Developer → Edit Config |
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) · `%APPDATA%\Claude\claude_desktop_config.json` (Windows) · `~/.config/Claude/claude_desktop_config.json` (Linux) | Settings → Developer → Edit Config · **See PATH fix above before writing this file** |
 | **Claude Code** | `~/.claude.json` (user) or `.mcp.json` (project) | `claude mcp add` CLI or edit directly |
 | **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | MCPs icon in Cascade panel → or Windsurf Settings → Cascade → MCP Servers |
 | **VS Code (Copilot)** | `.vscode/mcp.json` (workspace) or user profile `mcp.json` | Cmd Palette → "MCP: Add Server" (see different format below) |
@@ -190,7 +262,8 @@ Now we'll add ToolUniverse to your app's MCP configuration. Based on the client 
 | **Trae** | `.trae/mcp.json` (project) or global via Trae UI | Ctrl+U → AI Management → MCP → Configure Manually |
 | **OpenCode** | `opencode.json` (project) or global config | `opencode mcp add` CLI or edit directly |
 
-**Windows/Linux paths differ** -- check your client's documentation for the exact location.
+**Windows paths**: Claude Desktop → `%APPDATA%\Claude\claude_desktop_config.json`, Cursor → `%USERPROFILE%\.cursor\mcp.json`, Claude Code → `%USERPROFILE%\.claude.json`.
+
 
 Most clients use the same JSON `mcpServers` format shown above. **Exceptions**: VS Code uses `"servers"` key, Codex uses TOML, and OpenCode uses a `"mcp"` key -- see below for their specific formats.
 
@@ -352,7 +425,7 @@ Test each configured key with a real tool call:
 
 ### Step 5: Test & Status Check
 
-Ask the user to restart their app, then run through this checklist together. For each item, run the diagnostic command and report ✅ or ❌.
+Ask the user to **completely quit and reopen their app** (not just close the window — use Quit from the menu). Then run through this checklist together:
 
 ```bash
 # 1. Is uv installed?
@@ -360,13 +433,45 @@ uvx --version && echo "✅ uv/uvx installed" || echo "❌ uv not found"
 
 # 2. Does ToolUniverse start cleanly?
 timeout 5 uvx tooluniverse --help > /dev/null 2>&1 && echo "✅ ToolUniverse starts OK" || echo "❌ ToolUniverse failed to start"
+```
 
+Replace `<CONFIG_PATH>` below with the path for the detected client (see config table in Step 2):
+```bash
 # 3. Does the config file exist?
-# (replace path for your client)
-[ -f ~/.cursor/mcp.json ] && echo "✅ MCP config exists" || echo "❌ Config file not found"
+[ -f <CONFIG_PATH> ] && echo "✅ MCP config exists" || echo "❌ Config file not found"
 
 # 4. Does the config contain tooluniverse?
-grep -q "tooluniverse" ~/.cursor/mcp.json 2>/dev/null && echo "✅ tooluniverse in config" || echo "❌ tooluniverse missing from config"
+grep -q "tooluniverse" <CONFIG_PATH> 2>/dev/null && echo "✅ tooluniverse in config" || echo "❌ tooluniverse missing from config"
+```
+
+Quick reference for common clients:
+- Cursor: `~/.cursor/mcp.json`
+- Claude Desktop (macOS): `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Claude Desktop (Linux): `~/.config/Claude/claude_desktop_config.json`
+- Windsurf: `~/.codeium/windsurf/mcp_config.json`
+- Claude Code: `~/.claude.json`
+
+**Tell the user what to look for in the app UI:**
+
+- **Claude Desktop / Cursor / Windsurf**: Look for a 🔨 **hammer icon** in the bottom of the chat input box. Click it — you should see `tooluniverse` listed with its tools. If the hammer is missing, the server didn't connect.
+- **Claude Code / Gemini CLI / Codex CLI**: Run `/mcp` or `mcp list` to list connected servers.
+- **All clients**: If nothing appears, **check the logs immediately** (fastest way to find "spawn ENOENT" and similar errors):
+
+```bash
+# Claude Desktop (macOS)
+tail -20 ~/Library/Logs/Claude/mcp*.log
+
+# Claude Desktop (Linux)
+tail -20 ~/.config/Claude/logs/mcp*.log
+
+# Claude Desktop (Windows — run in PowerShell)
+# type "$env:APPDATA\Claude\logs\mcp*.log"
+
+# Cursor (macOS)
+tail -20 ~/Library/Application\ Support/Cursor/logs/main.log
+
+# Windsurf (macOS)
+tail -20 ~/.codeium/windsurf/logs/*.log 2>/dev/null
 ```
 
 After the restart, **show the user this status summary** and fill in each line:
@@ -375,9 +480,9 @@ After the restart, **show the user this status summary** and fill in each line:
 Setup Status
 ─────────────────────────────────────
 ✅/❌  uv installed         (version: ___)
-✅/❌  ToolUniverse starts
-✅/❌  MCP config created
-✅/❌  Server visible in [client]
+✅/❌  ToolUniverse starts  (uvx tooluniverse --help)
+✅/❌  MCP config created   (config file found)
+✅/❌  Server visible       (🔨 hammer icon / mcp list)
 ✅/❌  Test tool call works
 ⬜     API keys (optional — add anytime)
 ─────────────────────────────────────
@@ -566,9 +671,31 @@ pip install tooluniverse[all]
 
 ### Issue 5: MCP Server Won't Start
 
-**Symptom**: No tooluniverse server appears in the client's server list
+**Symptom**: No tooluniverse server appears in the client's server list, or you see "Failed to spawn process", "ENOENT", "command not found"
 
-**Diagnostic — run these in order, stop at the first failure:**
+**#1 most common cause — especially on Claude Desktop / Windsurf / other GUI apps**: The app doesn't inherit your shell PATH, so it can't find `uvx`. Pick a fix:
+
+**Option A — Homebrew (macOS, recommended, permanent):**
+```bash
+brew install uv
+# Then restart Claude Desktop — can now use "uvx" everywhere, no absolute path needed
+```
+
+**Option B — Symlink (macOS/Linux, permanent):**
+```bash
+sudo ln -sf "$(which uvx)" /usr/local/bin/uvx   # Intel Mac / Linux
+# OR for Apple Silicon Mac:
+sudo ln -sf "$(which uvx)" /opt/homebrew/bin/uvx
+```
+
+**Option C — Absolute path (all platforms, quick fix):**
+```bash
+which uvx   # macOS/Linux → e.g. /opt/homebrew/bin/uvx or /Users/you/.local/bin/uvx
+where uvx   # Windows
+```
+Then use that full path as `"command"` in your config instead of `"uvx"`.
+
+**Full diagnostic chain — run these in order:**
 ```bash
 # 1. Can uvx find and run it?
 uvx tooluniverse --help
@@ -580,11 +707,11 @@ uvx tooluniverse
 python3 -m json.tool ~/.cursor/mcp.json   # replace path for your client
 
 # 4. View the client's MCP logs
-tail -50 ~/Library/Logs/Claude/mcp*.log 2>/dev/null   # Claude Desktop (macOS)
-ls ~/Library/Application\ Support/Cursor/logs/         # Cursor (macOS)
+tail -50 ~/Library/Logs/Claude/mcp*.log 2>/dev/null        # Claude Desktop (macOS)
+tail -50 ~/Library/Application\ Support/Cursor/logs/*.log  # Cursor (macOS)
 ```
 
-Fix based on where the chain breaks. Common causes: trailing commas in JSON, wrong config file path, `uvx` not on PATH when the app launches.
+Fix based on where the chain breaks. Other common causes: trailing commas in JSON, wrong config file path.
 
 ### Issue 6: API Key Errors (401/403)
 
