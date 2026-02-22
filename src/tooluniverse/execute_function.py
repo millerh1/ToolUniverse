@@ -1192,7 +1192,7 @@ class ToolUniverse:
 
                 # Create auto loader instance
                 self.logger.debug("Creating auto loader instance...")
-                auto_loader = tool_type_mappings["MCPAutoLoaderTool"](loader_config)
+                auto_loader = get_tool_class_lazy("MCPAutoLoaderTool")(loader_config)
                 self.logger.debug("Auto loader instance created")
 
                 # Run auto-load process with proper session cleanup and timeout
