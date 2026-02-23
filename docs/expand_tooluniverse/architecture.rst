@@ -1,8 +1,6 @@
 ToolUniverse Architecture
 =============================
 
-This document provides a comprehensive overview of ToolUniverse's code architecture, directory organization, core components, tool discovery/execution flow, MCP integration, and extension points.
-
 Overview
 --------
 

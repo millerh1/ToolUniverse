@@ -91,7 +91,7 @@ tooluniverse-smcp-stdio
 tooluniverse-doctor
 ```
 
-**Incorrect**:
+Incorrect:
 ```bash
 python -m tooluniverse.smcp_server
 python -m tooluniverse.doctor

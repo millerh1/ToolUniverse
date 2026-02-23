@@ -570,24 +570,11 @@ ToolUniverse currently provides several pre-built compose tools that demonstrate
 - **Dynamic data extraction** (e.g., SMILES from drug names)
 - **Multi-strategy approaches** for robust data retrieval
 
-Summary
--------
+.. seealso::
 
-ToolUniverse's Tool Composer enables the creation of sophisticated scientific workflows by combining individual tools with heterogeneous backends. The container function `compose(arguments, tooluniverse, call_tool)` serves as the execution backbone, providing:
-
-- **Flexible Multi-tool Execution**: Support for chaining, broadcasting, and agentic loops
-- **Heterogeneous Integration**: Seamless combination of tools from different scientific databases and APIs
-- **Adaptive Analysis**: Multi-step experimental analysis with tool feedback incorporation
-- **Protocol Compliance**: Consistent interaction with tools through the ToolUniverse schema
-
-The Tool Caller interface abstracts tool invocation, enabling developers to focus on workflow logic rather than tool management details. This architecture supports complex research patterns while maintaining simplicity and reliability.
-
-Next Steps
-----------
-
-- **Learn Components**: :doc:`../expand_tooluniverse/architecture` - Understand ToolUniverse architecture
-- **Platform Setup**: :doc:`building_ai_scientists/index` - Connect to AI agents
-- **Case Studies**: :doc:`scientific_workflows` - Real composition examples
+   - :doc:`../expand_tooluniverse/architecture` - ToolUniverse architecture
+   - :doc:`building_ai_scientists/index` - Connect to AI agents
+   - :doc:`scientific_workflows` - Real composition examples
 
 .. tip::
    **Start simple**: Begin with sequential workflows like the LiteratureSearchTool example, then progress to more complex patterns as you become comfortable with tool composition.

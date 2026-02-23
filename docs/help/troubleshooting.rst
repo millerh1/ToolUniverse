@@ -1,8 +1,6 @@
 Troubleshooting Tutorial
 =====================
 
-This Tutorial helps you diagnose and resolve common issues with ToolUniverse.
-
 Quick Diagnostic
 ----------------
 

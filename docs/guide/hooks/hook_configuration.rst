@@ -3,8 +3,6 @@ Hook Configuration
 
 **Advanced configuration and customization for hooks**
 
-This Tutorial covers advanced configuration options for the ToolUniverse hooks system, including custom settings, tool-specific configurations, and performance optimization.
-
 Configuration Approaches
 ------------------------
 
@@ -450,8 +448,8 @@ Troubleshooting
        with open('hook_config.json', 'r') as f:
            config = json.load(f)
        print("Configuration is valid JSON")
-   except json.JSONDecodeError as e:
-       print(f"Invalid JSON: {e}")
+   except (FileNotFoundError, json.JSONDecodeError) as e:
+       print(f"Error: {e}")
 
 **Debug Configuration**
 
@@ -488,13 +486,9 @@ Troubleshooting
 Next Steps
 ----------
 
-**Learn More**
+.. seealso::
 
-- **SummarizationHook** → :doc:`summarization_hook` - AI-powered output summarization
-- **FileSaveHook** → :doc:`file_save_hook` - File-based output processing
-- **Hooks Overview** → :doc:`index` - Complete hooks system Tutorial
-
-**Related Topics**
-
-- **Tool Composition** → :doc:`../tool_composition` - Chain tools into workflows
-- **Examples** → :doc:`../examples` - More usage examples
+   - :doc:`summarization_hook` - AI-powered output summarization
+   - :doc:`file_save_hook` - File-based output processing
+   - :doc:`index` - Complete hooks system overview
+   - :doc:`../tool_composition` - Chain tools into workflows

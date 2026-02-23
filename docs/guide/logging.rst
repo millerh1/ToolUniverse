@@ -3,7 +3,7 @@ Logging Tutorial
 
 **Configure and use ToolUniverse's comprehensive logging system**
 
-ToolUniverse provides a robust logging system to help you monitor tool execution, debug issues, and track research workflows. This Tutorial covers all logging levels, configuration methods, and best practices.
+ToolUniverse provides a robust logging system to help you monitor tool execution, debug issues, and track research workflows.
 
  Logging Overview
 -------------------

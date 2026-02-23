@@ -274,13 +274,9 @@ Verify hook configuration:
 Next Steps
 ----------
 
-**Learn More**
+.. seealso::
 
-- **FileSaveHook** → :doc:`file_save_hook` - File-based output processing
-- **Configuration** → :doc:`hook_configuration` - Advanced configuration options
-- **Hooks Overview** → :doc:`index` - Complete hooks system Tutorial
-
-**Related Topics**
-
-- **Tool Composition** → :doc:`../tool_composition` - Chain tools into workflows
-- **Examples** → :doc:`../examples` - More usage examples
+   - :doc:`file_save_hook` - File-based output processing
+   - :doc:`hook_configuration` - Advanced configuration options
+   - :doc:`index` - Complete hooks system overview
+   - :doc:`../tool_composition` - Chain tools into workflows

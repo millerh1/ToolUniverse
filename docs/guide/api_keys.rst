@@ -1,8 +1,6 @@
 API Keys and Authentication
 ===========================
 
-This guide explains which API keys are required or recommended for ToolUniverse functionality, how to obtain them, and how to configure them.
-
 .. note::
    **Looking for other environment variables?**
    
@@ -28,7 +26,6 @@ These API keys are required for specific tool categories to function:
 :How to Get: Visit https://build.nvidia.com and sign up for a free account. Navigate to your API keys section to generate a key.
 :Rate Limits: 40 requests per minute (free tier)
 :Tool Categories: ``nvidia_nim``
-
 
 Recommended API Keys (Enhanced Performance)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

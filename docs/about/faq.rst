@@ -3,10 +3,7 @@ Quick FAQ
 
 Quick answers to the most common questions about ToolUniverse.
 
-.. note::
-   **Looking for more detailed answers?**
-   
-   This page provides brief answers to get you started quickly. For comprehensive FAQ with detailed explanations, troubleshooting, and advanced topics, see :doc:`../help/faq`.
+.. seealso:: Full FAQ: :doc:`../help/faq`
 
 What is ToolUniverse?
 ---------------------

@@ -1,7 +1,7 @@
 Contributing to ToolUniverse
 ============================
 
-We welcome contributions to ToolUniverse! This Tutorial explains how to contribute effectively.
+We welcome contributions to ToolUniverse! 
 
 Getting Started
 ---------------

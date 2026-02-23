@@ -3,8 +3,6 @@ Python Guide
 
 **Complete guide for using ToolUniverse with Python**
 
-Welcome to the Python developer path! This guide covers everything you need to build scientific workflows with ToolUniverse's Python API.
-
 Installation
 ------------
 
@@ -247,7 +245,6 @@ ToolUniverse has **three ways** to find tools. Don't browse 1000+ tools manually
 
 .. seealso::
    For detailed guide on finding tools, see :doc:`finding_tools`
-
 
 Common Examples
 ~~~~~~~~~~~~~~~
@@ -534,5 +531,4 @@ Need Help?
 - **Issues**: `GitHub Issues <https://github.com/mims-harvard/ToolUniverse/issues>`_
 - **Community**: `Slack Channel <https://join.slack.com/t/tooluniversehq/shared_invite/zt-3dic3eoio-5xxoJch7TLNibNQn5_AREQ>`_
 - **FAQ**: :doc:`../help/faq`
-
 

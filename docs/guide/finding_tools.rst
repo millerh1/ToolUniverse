@@ -511,16 +511,9 @@ ToolUniverse's three tool finder methods provide powerful and flexible approache
 
 Happy tool hunting! 
 
-Further Resources
-=================
+.. seealso::
 
-**Related Documentation**:
-- :doc:`../guide/tools` - Overview of all ToolUniverse tools
-- :doc:`../guide/examples` - **Custom Tools**: Create your own tools using :doc:`../expand_tooluniverse/local_tools/local_tools_tutorial` - Creating your own tools
-
-- **API Reference**: Check :doc:`../api/modules` for programmatic access
-- **Tool Categories**: Browse tools by category in :doc:`../tools/tools_config_index` - Tool categories and descriptions
-
-**Need Help?**:
-- :doc:`../help/troubleshooting` - Common issues and solutions
-- :doc:`../help/faq` - Frequently asked questions
+   - :doc:`../guide/tools` - Overview of all tools
+   - :doc:`../api/modules` - API reference
+   - :doc:`../tools/tools_config_index` - Tool catalog by category
+   - :doc:`../help/troubleshooting` - Common issues and solutions

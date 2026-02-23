@@ -1,14 +1,7 @@
 Tutorial Navigation
 ===================
 
-
-This comprehensive tutorial takes you from basic concepts to advanced AI scientist workflows, with everything you need to democratize AI agents for scientific discovery.
-
-Choose the section that matches your current needs:
-
-**For Python API documentation**, see the dedicated :doc:`../api/modules` section.
-
-**For MCP integration and server setup**, see the comprehensive :doc:`building_ai_scientists/mcp_support` guide.
+**Python API:** :doc:`../api/modules` | **MCP setup:** :doc:`building_ai_scientists/mcp_support`
 
 Core Concepts
 -------------
@@ -55,9 +48,6 @@ Advanced Features
   * **FileSaveHook** → :doc:`hooks/file_save_hook` - File-based output processing and archiving
   * **Hook Configuration** → :doc:`hooks/hook_configuration` - Advanced configuration and customization
   * **Server & Stdio Hooks** → :doc:`hooks/server_stdio_hooks` - Using hooks with server and stdio interfaces
-
-.. tip::
-   **New to ToolUniverse?** Check out the "Get Started" section on the :doc:`../index` page for a recommended learning path.
 
 Tool Collections
 ----------------

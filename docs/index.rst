@@ -138,14 +138,6 @@ Explore More
       
       Complete tool catalog with examples
 
-   .. grid-item-card:: AI Agent Skills
-      :link: guide/skills_showcase
-      :link-type: doc
-      :shadow: md
-      :class-card: hover-lift
-      
-      Expert research workflows for AI agents
-
    .. grid-item-card:: Expand ToolUniverse
       :link: expand_tooluniverse/index
       :link-type: doc
