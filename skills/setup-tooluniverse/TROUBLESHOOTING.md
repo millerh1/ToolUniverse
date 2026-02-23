@@ -133,6 +133,121 @@ For pip users:
 pip install --upgrade tooluniverse
 ```
 
-## Still Stuck?
+## Issue 8: Python Version Too New
 
-Run `uvx tooluniverse --help` and share the output. Then open a GitHub issue at https://github.com/mims-harvard/ToolUniverse/issues or email [Shanghua Gao](mailto:shanghuagao@gmail.com).
+**Symptom**: Errors like `requires-python >=3.10,<3.14`, `SyntaxError` in ToolUniverse code, or `ModuleNotFoundError` for a built-in module after upgrading Python.
+
+ToolUniverse supports Python 3.10–3.13. Python 3.14+ (pre-release) may break things.
+
+**Check your Python version:**
+```bash
+python3 --version
+uvx tooluniverse --help   # see what Python uvx picks up
+```
+
+**Fix — pin to a compatible Python for uvx:**
+```bash
+uvx --python 3.12 tooluniverse --help
+```
+
+If that works, update your MCP config to use the pinned version:
+```json
+{
+  "mcpServers": {
+    "tooluniverse": {
+      "command": "uvx",
+      "args": ["--python", "3.12", "--refresh", "tooluniverse"],
+      "env": { "PYTHONIOENCODING": "utf-8" }
+    }
+  }
+}
+```
+
+## Issue 9: Stale or Broken Package Version
+
+**Symptom**: A tool that used to work now errors, or a new tool listed in docs isn't available, or you see `AttributeError` / `ImportError` referencing ToolUniverse internals.
+
+**Step 1 — force a fresh install:**
+```bash
+uv cache clean tooluniverse
+uvx tooluniverse --version   # should pull the latest
+```
+
+**Step 2 — check what version is running:**
+```bash
+uvx tooluniverse --version
+```
+
+**Step 3 — pin to latest stable if auto-update pulls a broken release:**
+```bash
+# In your MCP config args:
+"args": ["tooluniverse==<last-known-good-version>"]
+# Check releases: https://github.com/mims-harvard/ToolUniverse/releases
+```
+
+## Still Stuck? File a GitHub Issue
+
+If none of the above fixes it, open a GitHub issue. Run this script first — it collects system info with **no personal data** (paths and usernames are stripped):
+
+```bash
+python3 - << 'EOF'
+import sys, platform, subprocess, os, re, urllib.parse
+
+home = os.path.expanduser("~")
+def run(cmd):
+    try:
+        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True).strip()
+    except Exception as e:
+        out = f"error: {e}"
+    return re.sub(re.escape(home), "~", out)
+
+lines = [
+    "**Environment**",
+    f"- OS: {platform.system()} {platform.release()} {platform.machine()}",
+    f"- Python: {sys.version.split()[0]}",
+    f"- uv: {run('uv --version')}",
+    f"- uvx: {run('uvx --version')}",
+    f"- ToolUniverse: {run('uvx tooluniverse --version 2>/dev/null || echo unknown')}",
+    "",
+    "**Steps to reproduce**",
+    "1. <describe what you did>",
+    "",
+    "**Error message**",
+    "```",
+    "<paste full error here>",
+    "```",
+    "",
+    "**Expected behavior**",
+    "<what you expected to happen>",
+]
+
+body = "\n".join(lines)
+title = "Bug: <brief description>"
+url = ("https://github.com/mims-harvard/ToolUniverse/issues/new"
+       "?title=" + urllib.parse.quote(title)
+       + "&body=" + urllib.parse.quote(body))
+
+print("=" * 60)
+print("ISSUE BODY (copy-paste if opening manually):")
+print("=" * 60)
+print(body)
+print()
+print("=" * 60)
+print("PRE-FILLED ISSUE URL (open in browser):")
+print("=" * 60)
+print(url)
+EOF
+```
+
+The script prints two things:
+1. **Issue body** — copy-paste it into https://github.com/mims-harvard/ToolUniverse/issues/new
+2. **Pre-filled URL** — open it in a browser to get a GitHub issue form with the info already filled in
+
+**If GitHub CLI (`gh`) is installed**, you can create the issue directly — paste the body from above, then run:
+```bash
+gh issue create --repo mims-harvard/ToolUniverse \
+  --title "Bug: <brief description>" \
+  --body "<paste issue body here>"
+```
+
+You can also email [Shanghua Gao](mailto:shanghuagao@gmail.com) with the issue body.

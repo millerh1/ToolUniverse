@@ -26,6 +26,16 @@ Guide the user step-by-step through setting up ToolUniverse with MCP (Model Cont
 **This skill's own URL** (for bootstrapping):
 `https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILL.md`
 
+**Reference files** — fetch by GitHub raw URL (works whether this skill was loaded locally or from GitHub):
+
+| File | GitHub URL |
+|------|------------|
+| `CLAUDE_DESKTOP.md` | https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/CLAUDE_DESKTOP.md |
+| `API_KEYS_REFERENCE.md` | https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/API_KEYS_REFERENCE.md |
+| `MCP_CONFIG.md` | https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md |
+| `SKILLS_CATALOG.md` | https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md |
+| `TROUBLESHOOTING.md` | https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md |
+
 ## Step 0: Auto-Detect & Quick Start
 
 Welcome the user, then immediately run these detection commands **before asking any questions**:
@@ -79,7 +89,7 @@ After they paste that, your job here is done.
 
 Ask: "Would you like a **quick start** (running in ~2 minutes, no questions) or a **full setup** (I walk you through API keys and options)?"
 
-- **Quick start**: Pick the fastest single path — `brew install uv` (or curl installer), write the config with the python3 one-liner, restart the app, confirm hammer icon. Skip API keys entirely (user adds them later).
+- **Quick start**: Pick the fastest single path — `brew install uv` (or curl installer), write the config with the python3 one-liner, restart the app, confirm tools appear in the "Search and tools" / + button. Skip API keys entirely (user adds them later).
 - **Full setup**: Continue with all steps including API keys.
 
 **Question 2:** How will you use ToolUniverse?
@@ -133,7 +143,7 @@ uvx tooluniverse --help
 ```
 
 - **Prints usage text** → proceed.
-- **Error** → fix the uv install (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) Issue 2) before writing the config.
+- **Error** → fix the uv install (see [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) Issue 2) before writing the config.
 
 **Check if config file already exists:**
 ```bash
@@ -146,16 +156,18 @@ cat <CONFIG_PATH> 2>/dev/null || echo "CONFIG_NOT_FOUND"
 
 ---
 
-⚠️ **Claude Desktop only** — GUI apps don't inherit shell PATH. Read [MCP_CONFIG.md](MCP_CONFIG.md) for the full PATH fix (Homebrew, symlink, or absolute path options) before writing this config.
+🛑 **Claude Desktop users — STOP here and read [CLAUDE_DESKTOP.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/CLAUDE_DESKTOP.md) before writing any config.**
+
+Claude Desktop is a GUI app that does not inherit your shell's PATH. Pasting the standard `"command": "uvx"` config will silently fail with "ENOENT" unless uvx is in a system path the app can find. [CLAUDE_DESKTOP.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/CLAUDE_DESKTOP.md) walks through the PATH fix (Homebrew recommended) and provides the correct config for your setup. Come back here once the PATH issue is resolved.
 
 ---
 
-**Ask:** "Would you like ToolUniverse to auto-update whenever your app starts? (~1–2s startup overhead, recommended: yes)"
+**Ask (non-Claude-Desktop users):** "Would you like ToolUniverse to auto-update whenever your app starts? (~1–2s startup overhead, recommended: yes)"
 
 - **Yes** → use `["--refresh", "tooluniverse"]` in args
 - **No** → use `["tooluniverse"]`; upgrade manually with `uv cache clean tooluniverse`
 
-**Standard config (works for Cursor, Claude Desktop, Windsurf, Claude Code, Gemini CLI, Qwen Code, Trae, Cline):**
+**Standard config (Cursor, Windsurf, Claude Code, Gemini CLI, Qwen Code, Trae, Cline — and Claude Desktop once PATH is fixed):**
 ```json
 {
   "mcpServers": {
@@ -194,16 +206,16 @@ Replace `CONFIG_PATH` with the path for the user's client:
 | **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) · `%APPDATA%\Claude\...` (Win) · `~/.config/Claude/...` (Linux) |
 | **Claude Code** | `~/.claude.json` or `.mcp.json` |
 | **Windsurf** | `~/.codeium/windsurf/mcp_config.json` |
-| **VS Code (Copilot)** | `.vscode/mcp.json` — uses `"servers"` key, needs `"type": "stdio"` — see [MCP_CONFIG.md](MCP_CONFIG.md) |
-| **Codex (OpenAI)** | TOML format: `codex mcp add tooluniverse -- uvx tooluniverse` — see [MCP_CONFIG.md](MCP_CONFIG.md) |
-| **OpenCode** | `opencode.json` — uses `"mcp"` key — see [MCP_CONFIG.md](MCP_CONFIG.md) |
+| **VS Code (Copilot)** | `.vscode/mcp.json` — uses `"servers"` key, needs `"type": "stdio"` — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
+| **Codex (OpenAI)** | TOML format: `codex mcp add tooluniverse -- uvx tooluniverse` — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
+| **OpenCode** | `opencode.json` — uses `"mcp"` key — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
 | **Gemini CLI** | `~/.gemini/settings.json` |
 | **Qwen Code** | `~/.qwen/settings.json` |
 | **Trae** | `.trae/mcp.json` |
 | **Cline** | `cline_mcp_settings.json` (in VS Code extension globalStorage) |
 | **Antigravity** | `mcp_config.json` |
 
-For VS Code, Codex, and OpenCode special formats, read [MCP_CONFIG.md](MCP_CONFIG.md).
+For VS Code, Codex, and OpenCode special formats, read [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md).
 
 ## Step 3 (coding use only): Install Python package
 
@@ -231,7 +243,7 @@ Many tools work without keys, but some unlock powerful features. First, **ask th
 
 Then walk through **2–4 recommended keys** one at a time: explain what each unlocks, give the registration link, wait for them to sign up, help add the key to the `env` block in their config.
 
-For the full list of keys, registration steps, and which tools each enables, read [API_KEYS_REFERENCE.md](API_KEYS_REFERENCE.md).
+For the full list of keys, registration steps, and which tools each enables, read [API_KEYS_REFERENCE.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/API_KEYS_REFERENCE.md).
 
 **Quick reference — Tier 1 (most users):**
 
@@ -259,7 +271,7 @@ Add keys to the `env` block in your MCP config:
 timeout 10 uvx tooluniverse --help
 ```
 - Prints usage → proceed to restart.
-- Fails → fix first (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) Issue 5). Don't restart yet.
+- Fails → fix first (see [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) Issue 5). Don't restart yet.
 
 Ask user to **fully quit and reopen their app** (⌘Q on Mac — closing the window is not enough).
 
@@ -271,7 +283,8 @@ tail -f ~/.config/Claude/logs/mcp*.log          # Claude Desktop (Linux)
 Look for `"tooluniverse" connected` or tool schema output.
 
 **What to look for in the app UI:**
-- **Claude Desktop / Cursor / Windsurf**: 🔨 hammer icon at the bottom of the chat input.
+- **Claude Desktop (newer)**: A **"Search and tools"** button or **+** icon in the chat input → click it → `tooluniverse` should appear in the connected tools list.
+- **Claude Desktop (older) / Cursor / Windsurf**: 🔨 hammer icon at the bottom of the chat input → click to see available tools.
 - **Claude Code / Gemini CLI / Codex CLI**: Run `/mcp` or `mcp list`.
 
 **Show this status summary** and fill in each line:
@@ -281,7 +294,7 @@ Setup Status
 ✅/❌  uv installed         (uvx --version)
 ✅/❌  ToolUniverse starts  (uvx tooluniverse --help)
 ✅/❌  MCP config created   (config file found)
-✅/❌  Server visible       (🔨 hammer / Settings → Developer → MCP Servers)
+✅/❌  Server visible       ("Search and tools" / 🔨 hammer / Settings → Developer → MCP Servers)
 ✅/❌  Test tool call works
 ⬜     API keys (optional — add anytime)
 ─────────────────────────────────────
@@ -296,11 +309,11 @@ or
 execute_tool("PubMed_search_articles", {"query": "CRISPR", "max_results": 1})
 ```
 
-If all ✅, celebrate! 🎉 If any ❌, jump to the matching issue in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+If all ✅, celebrate! 🎉 If any ❌, jump to the matching issue in [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md).
 
 ## Step 6: Install ToolUniverse Skills
 
-Explain to the user: **Skills turn ToolUniverse from a toolbox into an expert research assistant.** Each skill is a pre-built workflow that knows exactly which of the 1200+ tools to call, in what order, to produce a complete research report — for drug profiling, literature reviews, cancer variant interpretation, and 60+ more domains. See the full catalog in [SKILLS_CATALOG.md](SKILLS_CATALOG.md).
+Explain to the user: **Skills turn ToolUniverse from a toolbox into an expert research assistant.** Each skill is a pre-built workflow that knows exactly which of the 1200+ tools to call, in what order, to produce a complete research report — for drug profiling, literature reviews, cancer variant interpretation, and 60+ more domains. See the full catalog in [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md).
 
 **Option A — User runs in terminal (quickest):**
 ```bash
@@ -343,11 +356,14 @@ rm -rf /tmp/tu-skills
 |-------|---------|-----|
 | uv not found | `uvx: command not found` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` then re-source shell |
 | GUI app can't find uvx | "Failed to spawn process" / "ENOENT" | `brew install uv` on macOS, or use absolute path in config |
-| Server won't appear | No hammer icon after restart | Run diagnostic chain in [TROUBLESHOOTING.md](TROUBLESHOOTING.md) Issue 5 |
+| Server won't appear | No "Search and tools" entry / no hammer after restart | Diagnostic chain → [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) Issue 5 |
 | API key rejected | 401/403 errors | Move key to `env` block in MCP config; restart app |
 | Context overflow | Client very slow | Already in compact mode; narrow categories if needed |
+| Python too new (3.14+) | `SyntaxError` / `requires-python` errors | `uvx --python 3.12 tooluniverse --help` → [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) Issue 8 |
+| Stale/broken package | Tool errors or missing tools | `uv cache clean tooluniverse` → [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) Issue 9 |
+| Still broken after all above | Persistent unexplained error | Run the issue-filing script in [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md) "Still Stuck?" — it collects system info and generates a pre-filled GitHub issue URL |
 
-Full diagnostics in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+Full diagnostics and GitHub issue helper in [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md).
 
 ## What's Next?
 
@@ -364,8 +380,9 @@ Point them to the `tooluniverse` general skill for tips on getting the most out 
 - **Instant bootstrap**: `Please read https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILL.md and follow it to help me set up ToolUniverse.`
 - **Auto-update config**: `["--refresh", "tooluniverse"]`
 - **Manual upgrade**: `uv cache clean tooluniverse` then restart
-- **Detailed API keys**: [API_KEYS_REFERENCE.md](API_KEYS_REFERENCE.md)
-- **All client config formats**: [MCP_CONFIG.md](MCP_CONFIG.md)
-- **Skills catalog**: [SKILLS_CATALOG.md](SKILLS_CATALOG.md)
-- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Claude Desktop PATH fix**: [CLAUDE_DESKTOP.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/CLAUDE_DESKTOP.md)
+- **Detailed API keys**: [API_KEYS_REFERENCE.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/API_KEYS_REFERENCE.md)
+- **All client config formats**: [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md)
+- **Skills catalog**: [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md)
+- **Troubleshooting**: [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md)
 - **Help**: https://github.com/mims-harvard/ToolUniverse/issues
