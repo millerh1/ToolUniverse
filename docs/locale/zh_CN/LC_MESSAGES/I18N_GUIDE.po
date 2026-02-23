@@ -50,7 +50,7 @@ msgstr "Generate English Documentation"
 
 #: ../../I18N_GUIDE.md:18 9fb3b827cc9b4f968ecf42964d207a70
 msgid "生成中文文档（基于翻译）"
-msgstr ""
+msgstr "Generate Chinese documentation (based on translation)"
 
 #: ../../I18N_GUIDE.md:19 2b5314e29cca43a1a06d9c403f6c1cec
 msgid "创建语言切换器页面"

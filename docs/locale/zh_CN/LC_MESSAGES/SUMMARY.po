@@ -333,7 +333,7 @@ msgstr ""
 
 #: ../../SUMMARY.md:282 ff9c03cd47694f8c9c3e088aff1f90b2
 msgid "翻译立即生效！✨"
-msgstr ""
+msgstr "翻译即时生效！✨"
 
 #: ../../SUMMARY.md:284 841d47c46942484ab77976c3a3f8cdfa
 msgid "🌟 主要特点"
@@ -449,7 +449,7 @@ msgstr ""
 
 #: ../../SUMMARY.md:321 6d530563e04b41029ed93a99aaf8d87a
 msgid "✅ `_static/language_switcher.css` - 切换器样式"
-msgstr ""
+msgstr "✅ `_static/language_switcher.css` - 切换器样式表"
 
 #: ../../SUMMARY.md:323 8d3e438054d34eb798c57770af7e59ca
 msgid "文档"
@@ -485,7 +485,7 @@ msgstr ""
 
 #: ../../SUMMARY.md:333 b1f7b9f0a96642ddb15c16dfc8150540
 msgid "`locale/zh_CN/LC_MESSAGES/quickstart.po`"
-msgstr ""
+msgstr "locale/zh_CN/LC_MESSAGES/quickstart.po"
 
 #: ../../SUMMARY.md:334 8587ab04031e4483b10f8aec4cbfd043
 msgid "`locale/zh_CN/LC_MESSAGES/installation.po`"
@@ -493,11 +493,11 @@ msgstr ""
 
 #: ../../SUMMARY.md:335 183d55ccd4a34136b1a4d3807042f6df
 msgid "`locale/zh_CN/LC_MESSAGES/getting_started.po`"
-msgstr ""
+msgstr "locale/zh_CN/LC_MESSAGES/getting_started.po"
 
 #: ../../SUMMARY.md:336 30b4af85f9204ef683d4fe218e779183
 msgid "`locale/zh_CN/LC_MESSAGES/faq.po`"
-msgstr ""
+msgstr "locale/zh_CN/LC_MESSAGES/faq.po"
 
 #: ../../SUMMARY.md:338 3ccb1f9d2879415e81d37d654818c039
 msgid "添加更多语言"

@@ -122,7 +122,7 @@ msgstr ""
 
 #: ../../MULTILANG_README.md:104 e338f642a44642cbb9dc9784d8fff70c
 msgid "🎨 主题特性"
-msgstr ""
+msgstr "🎨 主题功能"
 
 #: ../../MULTILANG_README.md:106 c9c98cb5329c40e596620871f3708176
 msgid "Shibuya 主题配置"

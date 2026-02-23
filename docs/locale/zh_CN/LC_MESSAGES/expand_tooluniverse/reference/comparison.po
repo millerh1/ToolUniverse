@@ -281,7 +281,7 @@ msgstr ""
 #: ../../expand_tooluniverse/reference/comparison.rst:92
 #: 721a3d11773c4679aaa06f0cd7cff466
 msgid "class MyTool(BaseTool):"
-msgstr ""
+msgstr "class MyTool(BaseTool)："
 
 #: ../../expand_tooluniverse/reference/comparison.rst:96
 #: a3241ab492f84699b50f72fa89c8b399

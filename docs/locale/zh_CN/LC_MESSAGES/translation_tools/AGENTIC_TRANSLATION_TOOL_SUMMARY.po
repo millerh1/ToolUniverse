@@ -391,7 +391,7 @@ msgstr "3. 生产准备就绪"
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:172
 #: 54d410a83a074e17a8526f1eb25efdd3
 msgid "完整的错误处理"
-msgstr ""
+msgstr "完整的错误处理机制"
 
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:173
 #: 49e9c29f26f1484e9848323096eefb53
@@ -503,6 +503,8 @@ msgstr ""
 #: f9cde4ab8c644fc6a1dac20e115694d6
 msgid "🚀 **简单易用**：命令行界面，无需编程知识"
 msgstr ""
+"🚀 **Simple and Easy to Use**: Command-line interface, no programming "
+"knowledge required"
 
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:203
 #: 02d8d0b3989047f58147720fafe74a99
@@ -512,7 +514,7 @@ msgstr ""
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:204
 #: 4fb746526b704ee3bb16b76e9d614672
 msgid "📊 **详细统计**：完整的翻译进度和状态信息"
-msgstr ""
+msgstr "📊 **详细统计**：完整的翻译进度与状态信息"
 
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:205
 #: 7b61ade9f7824096a5f70fd1753f3aa4
@@ -522,12 +524,12 @@ msgstr "🛡️ **错误处理**：优雅地处理各种异常情况"
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:206
 #: 1f338060717d4b79b6095db9725f46ae
 msgid "🔄 **批量处理**：支持大规模翻译任务"
-msgstr ""
+msgstr "🔄 **Batch Processing**：支持大规模翻译任务"
 
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:207
 #: 56d5eceb253c42729f4bfd79986b54a9
 msgid "🎯 **智能翻译**：使用 LLM 进行高质量翻译"
-msgstr ""
+msgstr "🎯 **智能翻译**：利用大型语言模型（LLM）实现高质量翻译"
 
 #: ../../translation_tools/AGENTIC_TRANSLATION_TOOL_SUMMARY.md:209
 #: 48e8a5f33d9a474493fb5014890c9db7

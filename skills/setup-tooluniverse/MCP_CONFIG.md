@@ -6,9 +6,8 @@ Advanced configuration options for ToolUniverse MCP integration.
 
 ### Cursor
 
-- **macOS**: `~/Library/Application Support/Cursor/User/mcp.json`
-- **Windows**: `%APPDATA%\Cursor\User\mcp.json`
-- **Linux**: `~/.config/Cursor/User/mcp.json`
+- **Global (all workspaces)** — macOS/Linux: `~/.cursor/mcp.json` · Windows: `%USERPROFILE%\.cursor\mcp.json`
+- **Project-level (single workspace)**: `.cursor/mcp.json` in the project root — can be committed to version control for team sharing
 
 ### Claude Desktop
 
@@ -16,39 +15,56 @@ Advanced configuration options for ToolUniverse MCP integration.
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
+### VS Code / Copilot
+
+- **Project-level** (workspace root): `.vscode/mcp.json`
+- Note: VS Code uses `"servers"` key (not `"mcpServers"`) and requires `"type": "stdio"` — see the VS Code template below.
+
+### Windsurf
+
+- `~/.codeium/windsurf/mcp_config.json`
+
+### Claude Code
+
+- Global: `~/.claude.json`
+- Project-level: `.mcp.json` in the project root
+
+### Gemini CLI
+
+- `~/.gemini/settings.json`
+
 ## Configuration Templates
 
 ### Basic Configuration (Recommended)
 
-Simplest setup using installed command:
+Zero-install setup using uvx (auto-downloads and runs ToolUniverse):
+
+```json
+{
+  "mcpServers": {
+    "tooluniverse": {
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
+```
+
+`--refresh` keeps ToolUniverse auto-updated on each startup (~1–2s overhead). Remove it to pin to the cached version and update manually with `uv cache clean tooluniverse`.
+
+### pip-Based Configuration (Alternative)
+
+If you have ToolUniverse installed via `pip install tooluniverse`, you can use the installed command directly:
 
 ```json
 {
   "mcpServers": {
     "tooluniverse": {
       "command": "tooluniverse-smcp-stdio",
-      "args": ["--compact-mode"]
-    }
-  }
-}
-```
-
-### UV-Based Configuration
-
-Using uv for better isolation:
-
-```json
-{
-  "mcpServers": {
-    "tooluniverse": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/tooluniverse-env",
-        "run",
-        "tooluniverse-smcp-stdio",
-        "--compact-mode"
-      ],
+      "args": ["--compact-mode"],
       "env": {
         "PYTHONIOENCODING": "utf-8"
       }
@@ -77,17 +93,37 @@ Using development installation:
 }
 ```
 
+### VS Code / Copilot Configuration
+
+VS Code uses a different schema. Create `.vscode/mcp.json` in the workspace root:
+
+```json
+{
+  "servers": {
+    "tooluniverse": {
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
+      "env": { "PYTHONIOENCODING": "utf-8" },
+      "type": "stdio"
+    }
+  }
+}
+```
+
+Key differences from standard config: uses `"servers"` (not `"mcpServers"`) and requires `"type": "stdio"`. After saving, fully restart VS Code and open Copilot Chat in that workspace.
+
 ## Configuration Options
 
-### Compact Mode (Recommended)
+### Compact Mode (Default with uvx)
 
-Exposes only 5 core tools, prevents context overflow:
+When using `uvx tooluniverse`, compact mode is **enabled by default** — no flag needed. It exposes only 5 core tools to prevent context overflow, while keeping all 1200+ tools accessible via `execute_tool`.
 
+If using the pip-based `tooluniverse-smcp-stdio` command, pass `--compact-mode` explicitly:
 ```json
 "args": ["--compact-mode"]
 ```
 
-**Core tools exposed**:
+**Core tools exposed in compact mode**:
 - `list_tools` - List all available tools
 - `grep_tools` - Search tools by keyword
 - `get_tool_info` - Get tool details
@@ -108,7 +144,7 @@ Load only specific tool categories:
 ]
 ```
 
-**Available categories**: Run `tooluniverse-smcp-stdio --list-categories` to see all.
+**Available categories**: Run `uvx tooluniverse --list-categories` to see all.
 
 **Warning**: Multiple categories may still cause context issues.
 
@@ -142,7 +178,7 @@ Enable output processing hooks (disabled by default for stdio):
 
 ```json
 "args": [
-  "--compact-mode",
+  "--refresh", "tooluniverse",
   "--hooks",
   "--hook-type",
   "SummarizationHook"
@@ -159,7 +195,7 @@ Enable detailed logging for debugging:
 
 ```json
 "args": [
-  "--compact-mode",
+  "--refresh", "tooluniverse",
   "--verbose"
 ]
 ```
@@ -215,8 +251,9 @@ Configure multiple servers:
 {
   "mcpServers": {
     "tooluniverse": {
-      "command": "tooluniverse-smcp-stdio",
-      "args": ["--compact-mode"]
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
+      "env": { "PYTHONIOENCODING": "utf-8" }
     },
     "other-server": {
       "command": "other-mcp-server",
@@ -234,8 +271,9 @@ Specify working directory:
 {
   "mcpServers": {
     "tooluniverse": {
-      "command": "tooluniverse-smcp-stdio",
-      "args": ["--compact-mode"],
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
+      "env": { "PYTHONIOENCODING": "utf-8" },
       "cwd": "/path/to/working/directory"
     }
   }
@@ -260,10 +298,23 @@ cat mcp.json | python3 -m json.tool
 Test the MCP command in terminal:
 
 ```bash
-tooluniverse-smcp-stdio --compact-mode
-# Should start without errors
-# Press Ctrl+C to exit
+uvx tooluniverse --help
+# Should print usage text without errors
 ```
+
+### Test with a ToolUniverse Skill
+
+After skills are installed (see SKILL.md Step 6), verify end-to-end by invoking the `tooluniverse` router skill in your prompt:
+
+> `"Use the tooluniverse skill to research the drug metformin"`
+
+The `tooluniverse` skill is a router — it automatically picks the right sub-skill and calls multiple tools. Mentioning it explicitly ensures it activates on any client, since not all clients auto-detect skills from natural language alone.
+
+If the response comes back as plain text without any tool calls, either skills are not installed, they are in the wrong directory, or the MCP server is not connected.
+
+Other examples:
+- `"Use the tooluniverse skill: what is known about Alzheimer's disease?"`
+- `"Use the tooluniverse skill: what does the literature say about CRISPR in cancer?"`
 
 ### Check Logs
 
@@ -293,9 +344,10 @@ After restarting application, check logs:
 
 ### Issue: Command Not Found
 
-- Verify installation: `pip show tooluniverse`
-- Check PATH: `which tooluniverse-smcp-stdio`
-- Use full path to command if needed
+- Verify uvx works: `uvx --version`
+- Test ToolUniverse directly: `uvx tooluniverse --help`
+- If uvx is missing, install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- For pip-based installs: `pip show tooluniverse` and `which tooluniverse-smcp-stdio`
 
 ### Issue: Environment Variables Not Working
 
@@ -307,11 +359,11 @@ After restarting application, check logs:
 
 ### Fast Startup
 
-Use compact mode and minimal categories:
+Use minimal categories (compact mode is already the default):
 
 ```json
 "args": [
-  "--compact-mode",
+  "--refresh", "tooluniverse",
   "--categories",
   "special_tools"
 ]
@@ -319,11 +371,11 @@ Use compact mode and minimal categories:
 
 ### Memory Optimization
 
-Reduce tool loading:
+Exclude heavy categories:
 
 ```json
 "args": [
-  "--compact-mode",
+  "--refresh", "tooluniverse",
   "--exclude-categories",
   "mcp_auto_loader_boltz"
 ]
@@ -346,12 +398,11 @@ For scientific research with common tools:
 {
   "mcpServers": {
     "tooluniverse": {
-      "command": "tooluniverse-smcp-stdio",
-      "args": [
-        "--compact-mode"
-      ],
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
       "env": {
-        "PYTHONIOENCODING": "utf-8"
+        "PYTHONIOENCODING": "utf-8",
+        "NCBI_API_KEY": "your-key-here"
       }
     }
   }
@@ -381,23 +432,21 @@ For tool development and testing:
 
 ### Production Use Case
 
-For production with specific tools:
+For production with specific tool categories:
 
 ```json
 {
   "mcpServers": {
     "tooluniverse-prod": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/opt/tooluniverse",
-        "run",
-        "tooluniverse-smcp-stdio",
+        "tooluniverse",
         "--categories",
         "uniprot",
         "ChEMBL",
         "opentarget"
-      ]
+      ],
+      "env": { "PYTHONIOENCODING": "utf-8" }
     }
   }
 }

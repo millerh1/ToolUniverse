@@ -70,7 +70,17 @@ echo "=== Detecting your AI client ===" && \
   echo "=== Detection complete ==="
 ```
 
-**On Windows**, detection won't run in bash — ask the user to check manually: Claude Desktop `%APPDATA%\Claude\claude_desktop_config.json`, Cursor `%USERPROFILE%\.cursor\mcp.json`.
+**On Windows**, the bash script won't run. Use this PowerShell block instead:
+
+```powershell
+@(
+  "$env:USERPROFILE\.cursor\mcp.json",
+  "$env:APPDATA\Claude\claude_desktop_config.json",
+  "$env:USERPROFILE\.codeium\windsurf\mcp_config.json",
+  "$env:USERPROFILE\.gemini\settings.json",
+  "$env:USERPROFILE\.qwen\settings.json"
+) | ForEach-Object { if (Test-Path $_) { "✅ Detected: $_" } }
+```
 
 **Remember the detected OS** — it changes config paths, uv install commands, and log locations in later steps.
 
@@ -218,7 +228,7 @@ Replace `CONFIG_PATH` with the path for the user's client:
 | **Claude Desktop** | ← See CLAUDE_DESKTOP.md above |
 | **Claude Code** | `~/.claude.json` or `.mcp.json` |
 | **Windsurf** | `~/.codeium/windsurf/mcp_config.json` |
-| **VS Code (Copilot)** | `.vscode/mcp.json` — uses `"servers"` key, needs `"type": "stdio"` — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
+| **VS Code (Copilot)** | `.vscode/mcp.json` in the workspace root — uses `"servers"` key (not `"mcpServers"`) and requires `"type": "stdio"` — see config below |
 | **Codex (OpenAI)** | TOML format: `codex mcp add tooluniverse -- uvx tooluniverse` — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
 | **OpenCode** | `opencode.json` — uses `"mcp"` key — see [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md) |
 | **Gemini CLI** | `~/.gemini/settings.json` |
@@ -227,7 +237,24 @@ Replace `CONFIG_PATH` with the path for the user's client:
 | **Cline** | `cline_mcp_settings.json` (in VS Code extension globalStorage) |
 | **Antigravity** | `mcp_config.json` |
 
-For VS Code, Codex, and OpenCode special formats, read [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md).
+For Codex and OpenCode special formats, read [MCP_CONFIG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/MCP_CONFIG.md).
+
+**VS Code / Copilot config** — create `.vscode/mcp.json` in the workspace root (VS Code uses a different schema than other clients):
+
+```json
+{
+  "servers": {
+    "tooluniverse": {
+      "command": "uvx",
+      "args": ["--refresh", "tooluniverse"],
+      "env": { "PYTHONIOENCODING": "utf-8" },
+      "type": "stdio"
+    }
+  }
+}
+```
+
+After saving `.vscode/mcp.json`, fully close and reopen VS Code, then open Copilot Chat in that workspace. The `tooluniverse` server should appear in the available tools.
 
 > ⏸️ **After Step 2**: Ask "Did the config file get written? Anything look wrong?" Wait before continuing.
 
@@ -305,7 +332,7 @@ Setup Status
 ─────────────────────────────────────
 ```
 
-**Live test call:**
+**Live test call** (verifies MCP connection):
 ```
 list_tools
 ```
@@ -314,44 +341,57 @@ or
 execute_tool("PubMed_search_articles", {"query": "CRISPR", "max_results": 1})
 ```
 
+**Skill smoke test** (verifies skills are installed — do after Step 6):
+> Say: `"Use the tooluniverse skill to research the drug metformin"`
+
+The `tooluniverse` skill is a router — it automatically picks the right sub-skill and calls multiple tools. Mentioning it explicitly ensures it activates on any client. If the response comes back as plain text without tool calls, skills are not installed or not in the correct directory.
+
 If all ✅, celebrate! 🎉 If any ❌, jump to the matching issue in [TROUBLESHOOTING.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/TROUBLESHOOTING.md).
 
 > ⏸️ **After Step 5**: Ask "Do you see ToolUniverse in the tools list? Did the test call return anything?" Wait for confirmation — then **immediately proceed to Step 6**. Do not skip it. Skills are what transform ToolUniverse from a raw API layer into an intelligent research assistant.
 
-## Step 6: Install ToolUniverse Skills ⭐ highly recommended
+## Step 6: Install ToolUniverse Skills (Required)
 
-**This is the most impactful step of the whole setup.** Without skills, the user has access to 1200+ tools but no guidance on how to use them together. With skills, they get 65+ expert research workflows — each one knows exactly which tools to call, in what order, to produce a complete research report on drugs, targets, diseases, cancer variants, genomics, and more.
+**Do not skip this step.** Without skills, the user has 1200+ tools but no guidance on how to use them together. Skills are what transform ToolUniverse into an intelligent research assistant — each one knows exactly which tools to call, in what order, to produce a full evidence-graded report on drugs, targets, diseases, variants, genomics, and more.
 
 **Say this to the user** (adapt to their language and research interest from Step 4):
 
-> "Now for the best part — ToolUniverse comes with 65+ research skills that work like expert guides. Instead of calling tools manually, you just say 'Research the drug metformin' or 'What genes are associated with type 2 diabetes?' and the right skill takes over, calls the right tools in the right order, and gives you a full evidence-graded report. This takes about a minute to install."
+> "One more required step — installing ToolUniverse's 65+ research skills. Instead of calling tools manually, you just say 'Research the drug metformin' or 'What genes are associated with type 2 diabetes?' and the right skill runs automatically. This takes under a minute."
 
-**Strongly encourage installation.** If the user hesitates or says "maybe later", remind them:
-- Skills work immediately — no extra configuration needed after install
-- They can always add more skills later, but having them from the start makes ToolUniverse far more accessible
-- The install is one command and takes under a minute
-
-**Option A — User runs in terminal (quickest):**
+**Option A — User runs in terminal (quickest, cross-platform):**
 ```bash
 npx skills add mims-harvard/ToolUniverse
 ```
 This auto-detects the client and installs into the correct directory. Ask the user to confirm it completed successfully.
 
-**Option B — Agent installs directly** (use this if you have shell/terminal access, or if npx fails):
+**Option B — If npx fails** (corporate network, cert issues, or Windows proxy problems), use the manual git clone path.
+
+*bash (macOS/Linux):*
 ```bash
 git clone --depth 1 --filter=blob:none --sparse https://github.com/mims-harvard/ToolUniverse.git /tmp/tu-skills
 cd /tmp/tu-skills && git sparse-checkout set skills
-```
-Find the right skills directory for the user's client in [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md), then copy:
-```bash
-# Example for Cursor:
+# Example for Cursor — check SKILLS_CATALOG.md for other clients:
 mkdir -p .cursor/skills && cp -r /tmp/tu-skills/skills/* .cursor/skills/
 rm -rf /tmp/tu-skills
 ```
 
-**Suggest a skill to try** based on their research interests from Step 4:
-- "Try: **'Research the drug metformin'**" — triggers the drug-research skill
-- "Try: **'What does the literature say about CRISPR in cancer?'**" — triggers literature-deep-research
+*PowerShell (Windows):*
+```powershell
+git clone --depth 1 --filter=blob:none --sparse https://github.com/mims-harvard/ToolUniverse.git "$env:TEMP\tu-skills"
+Set-Location "$env:TEMP\tu-skills"
+git sparse-checkout set skills
+# Example for Cursor — check SKILLS_CATALOG.md for other clients:
+New-Item -ItemType Directory -Force ".cursor\skills" | Out-Null
+robocopy "$env:TEMP\tu-skills\skills" ".cursor\skills" /E
+Remove-Item -Recurse -Force "$env:TEMP\tu-skills"
+```
+
+Find the right skills directory for the user's client in [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md).
+
+**Verify skills are wired up** — ask the user to say:
+> `"Use the tooluniverse skill to research the drug metformin"`
+
+The `tooluniverse` skill is a router — it picks the right sub-skill automatically. Mentioning it explicitly ensures it activates on any client. If the response comes back as plain text without tool calls, the skills directory is likely wrong — check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md) for the correct path for their client.
 
 > ⏸️ **After Step 6**: Don't just confirm installation — **immediately ask the user what problem they want to solve**. Say something like: "Skills are ready! What would you like to research? Tell me your topic — a drug, disease, gene, or research question — and I'll use the right skill to give you a full report." Then activate the matching skill based on their answer. This is the whole point of the setup.
 

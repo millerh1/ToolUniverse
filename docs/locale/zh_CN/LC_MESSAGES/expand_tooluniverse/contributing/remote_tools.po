@@ -242,12 +242,12 @@ msgstr "raise ValueError(f\"未知操作: {operation}\")"
 #: ../../expand_tooluniverse/contributing/remote_tools.rst:98
 #: 4d984e4e3977461080213b0274d630e7
 msgid "return {"
-msgstr ""
+msgstr "返回 {"
 
 #: ../../expand_tooluniverse/contributing/remote_tools.rst:99
 #: 3e94fd23a619433188b16c2900923424
 msgid "\"result\": result, \"operation\": operation, \"success\": True"
-msgstr ""
+msgstr "\"result\": 结果, \"operation\": 操作, \"success\": True"
 
 #: ../../expand_tooluniverse/contributing/remote_tools.rst:102
 #: d732de2551054678b985922ecb74c372
@@ -258,6 +258,8 @@ msgstr "请提供具体的英文文本内容，我将为您进行翻译。"
 #: 036c39c21adb433dab1b8845d79295fa
 msgid "@mcp.tool(\"health_check\") def health_check() -> dict:"
 msgstr ""
+"@mcp.tool(\"health_check\") \n"
+"def health_check() -> dict:"
 
 #: ../../expand_tooluniverse/contributing/remote_tools.rst:106
 #: d0accfb1cc314544928e023e7b9e46b7

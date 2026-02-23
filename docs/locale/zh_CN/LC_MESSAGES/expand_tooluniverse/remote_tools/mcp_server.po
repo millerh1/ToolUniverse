@@ -130,7 +130,7 @@ msgstr ""
 #: ../../expand_tooluniverse/remote_tools/mcp_server.rst:366
 #: ce8eb469bcb249e8a64f26ff03271387
 msgid "WORKDIR /app"
-msgstr ""
+msgstr "工作目录 /app"
 
 #: ../../expand_tooluniverse/remote_tools/mcp_server.rst:368
 #: a42558a828e3436885734162402a6b08
