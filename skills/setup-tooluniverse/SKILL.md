@@ -353,7 +353,7 @@ rm -rf /tmp/tu-skills
 - "Try: **'Research the drug metformin'**" — triggers the drug-research skill
 - "Try: **'What does the literature say about CRISPR in cancer?'**" — triggers literature-deep-research
 
-> ⏸️ **After Step 6**: Confirm skills work by running a live demo right now — say "Let me try one for you" and call `execute_tool` or trigger a skill with "Research the drug aspirin" to show the user what they just unlocked. This is the payoff moment — make it feel exciting.
+> ⏸️ **After Step 6**: Don't just confirm installation — **immediately ask the user what problem they want to solve**. Say something like: "Skills are ready! What would you like to research? Tell me your topic — a drug, disease, gene, or research question — and I'll use the right skill to give you a full report." Then activate the matching skill based on their answer. This is the whole point of the setup.
 
 ## Common Issues
 
@@ -372,4 +372,26 @@ Full diagnostics and GitHub issue helper in [TROUBLESHOOTING.md](https://raw.git
 
 ## What's Next?
 
-Setup is complete. Point the user to the `tooluniverse` general skill for tips on getting the most out of 1200+ tools, and remind them they can add more API keys or skills anytime. If they hit any issues, open a GitHub issue at https://github.com/mims-harvard/ToolUniverse/issues.
+Setup is complete. **Explain to the user how to use ToolUniverse skills**, then immediately ask what they want to research.
+
+### How skills work (tell the user this)
+
+Skills activate automatically — the user just writes a natural language request. No special commands, no prefixes. Examples:
+
+| Say this… | What happens |
+|-----------|-------------|
+| `"Research the drug metformin"` | drug-research skill runs: identity, pharmacology, targets, safety, ADMET |
+| `"What is known about Alzheimer's disease?"` | disease-research skill runs: genetics, mechanisms, treatments, trials |
+| `"What are the known targets of imatinib?"` | target-research skill runs: structure, interactions, druggability |
+| `"What does the literature say about CRISPR in sickle cell?"` | literature-deep-research skill runs: PubMed search, evidence grading, synthesis |
+| `"Interpret the EGFR L858R mutation in lung cancer"` | cancer-variant-interpretation skill runs: clinical evidence, therapies, trials |
+
+The skill reads the question, calls the right tools in the right order, and produces a full evidence-graded report. The user doesn't need to know which skill to pick — just ask the question.
+
+### Now ask the user
+
+> "What would you like to research first? Tell me a drug, disease, gene, or question and I'll generate a full report."
+
+Take their answer and activate the `tooluniverse` skill — it is a router that automatically picks the right sub-skill and runs it. Don't end the conversation here — end it with the user getting real value.
+
+The user can add more API keys or skills anytime. Issues → https://github.com/mims-harvard/ToolUniverse/issues.
