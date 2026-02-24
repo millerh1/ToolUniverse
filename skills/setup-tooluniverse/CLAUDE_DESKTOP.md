@@ -137,3 +137,48 @@ Common error messages and what they mean:
 - `ENOENT` / `spawn uvx ENOENT` → uvx not found; use absolute path or Homebrew fix
 - `spawn /Users/you/.local/bin/uvx ENOENT` → wrong absolute path; run `which uvx` again
 - `exit 1` immediately → run `uvx tooluniverse --help` in terminal to see the actual error
+
+## Installing Skills (Required)
+
+Skills are required for ToolUniverse to work as an intelligent research assistant. Run in terminal:
+
+**Option A — npx (quickest):**
+```bash
+npx skills add mims-harvard/ToolUniverse --all
+```
+If `npx` is not found, install Node.js from [nodejs.org](https://nodejs.org) (LTS version includes npx), then retry.
+
+**Option B — git clone (if npx fails):**
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/mims-harvard/ToolUniverse.git /tmp/tu-skills
+cd /tmp/tu-skills && git sparse-checkout set skills
+# macOS — adjust path for Linux (~/.config/Claude/skills/) or Windows (%APPDATA%\Claude\skills\)
+mkdir -p ~/Library/Application\ Support/Claude/skills && cp -r /tmp/tu-skills/skills/* ~/Library/Application\ Support/Claude/skills/
+rm -rf /tmp/tu-skills
+```
+
+## Verifying Skills Are Installed
+
+After running `npx skills add`, **check the terminal output** — it prints the exact directory where skills were installed. Use that path to verify:
+
+```bash
+ls <path-from-npx-output> | grep tooluniverse
+```
+
+If the output didn't show the path, the default location for Claude Desktop varies by OS:
+- **macOS**: `~/Library/Application Support/Claude/skills/`
+- **Linux**: `~/.config/Claude/skills/`
+- **Windows**: `%APPDATA%\Claude\skills\`
+
+```bash
+# macOS example:
+ls ~/Library/Application\ Support/Claude/skills | grep tooluniverse
+```
+
+✅ **Pass**: You see folders like `tooluniverse`, `tooluniverse-drug-research`, etc. → skills are ready.
+❌ **Fail**: Nothing listed → wrong directory or install didn't complete. Check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md) and retry.
+
+**Smoke test** — in Claude Desktop, say:
+> `"Use the tooluniverse skill to research the drug metformin"`
+
+If the response is plain text with no tool calls, skills are not in the right directory.

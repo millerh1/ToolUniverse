@@ -153,7 +153,21 @@ Remove-Item -Recurse -Force "$env:TEMP\tu-skills"
 
 > Note: The exact skills directory for Trae may vary. Check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md) if skills don't activate after installation.
 
-> ⏸️ Ask: "Did the skills install complete without errors?" Wait before continuing.
+**Verify skills were installed** — run in your system terminal:
+
+*macOS / Linux:*
+```bash
+ls ~/.trae/skills | grep tooluniverse
+```
+*Windows (PowerShell):*
+```powershell
+Get-ChildItem "$env:APPDATA\Trae\skills" | Where-Object { $_.Name -like "*tooluniverse*" }
+```
+
+✅ **Pass**: You see folders like `tooluniverse`, `tooluniverse-drug-research`, etc. → proceed to Step 4.
+❌ **Fail**: Nothing listed → the install didn't complete or went to the wrong directory. Re-run the install command or try the git clone option.
+
+> ⏸️ Ask: "Do you see tooluniverse skill folders listed?" Wait before continuing.
 
 ---
 

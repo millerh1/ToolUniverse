@@ -32,7 +32,7 @@ Never run ahead. Never explain Step 3 while the user is still on Step 1. Never o
 
 ## Internal Notes (do not show to user)
 
-⚠️ **ToolUniverse has 1200+ tools** which will cause context window overflow if all exposed directly. The default `tooluniverse` command enables compact mode automatically, exposing only 5 core tools (list_tools, grep_tools, get_tool_info, execute_tool, find_tools) while keeping all 1200+ accessible via execute_tool.
+⚠️ **ToolUniverse has 1000+ tools** which will cause context window overflow if all exposed directly. The default `tooluniverse` command enables compact mode automatically, exposing only 5 core tools (list_tools, grep_tools, get_tool_info, execute_tool, find_tools) while keeping all 1000+ accessible via execute_tool.
 
 **This skill's own URL** (for bootstrapping):
 `https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILL.md`
@@ -376,7 +376,7 @@ If all ✅, celebrate! 🎉 If any ❌, jump to the matching issue in [TROUBLESH
 
 ## Step 6: Install ToolUniverse Skills (Required)
 
-**Do not skip this step.** Without skills, the user has 1200+ tools but no guidance on how to use them together. Skills are what transform ToolUniverse into an intelligent research assistant — each one knows exactly which tools to call, in what order, to produce a full evidence-graded report on drugs, targets, diseases, variants, genomics, and more.
+**Do not skip this step.** Without skills, the user has 1000+ tools but no guidance on how to use them together. Skills are what transform ToolUniverse into an intelligent research assistant — each one knows exactly which tools to call, in what order, to produce a full evidence-graded report on drugs, targets, diseases, variants, genomics, and more.
 
 **Say this to the user** (adapt to their language and research interest from Step 4):
 
@@ -413,12 +413,28 @@ Remove-Item -Recurse -Force "$env:TEMP\tu-skills"
 
 Find the right skills directory for the user's client in [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md).
 
-**Verify skills are wired up** — ask the user to say:
+**Verify skills were installed** — run in terminal (replace `SKILLS_DIR` with the client's skills directory):
+
+*bash (macOS/Linux):*
+```bash
+ls SKILLS_DIR | grep tooluniverse
+```
+*PowerShell (Windows):*
+```powershell
+Get-ChildItem "SKILLS_DIR" | Where-Object { $_.Name -like "*tooluniverse*" }
+```
+
+✅ **Pass**: You see folders like `tooluniverse`, `tooluniverse-drug-research`, etc. → continue to smoke test.
+❌ **Fail**: Nothing listed → the skills directory is wrong. Check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md) for the correct path for their client, then re-run the install.
+
+**Smoke test** — once directory check passes, ask the user to say:
 > `"Use the tooluniverse skill to research the drug metformin"`
 
-The `tooluniverse` skill is a router — it picks the right sub-skill automatically. Mentioning it explicitly ensures it activates on any client. If the response comes back as plain text without tool calls, the skills directory is likely wrong — check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md) for the correct path for their client.
+If the response comes back as plain text without tool calls, the skills directory is likely still wrong — re-check [SKILLS_CATALOG.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/SKILLS_CATALOG.md).
 
 > ⏸️ **After Step 6**: Don't just confirm installation — **immediately ask the user what problem they want to solve**. Say something like: "Skills are ready! What would you like to research? Tell me your topic — a drug, disease, gene, or research question — and I'll use the right skill to give you a full report." Then activate the matching skill based on their answer. This is the whole point of the setup.
+>
+> Also say: "Whether setup went smoothly or you hit any bumps — your feedback helps improve ToolUniverse for everyone. You can share suggestions or report issues at https://github.com/mims-harvard/ToolUniverse/issues — even a quick note like 'Step 3 was confusing on Windows' is valuable."
 
 ## Common Issues
 
@@ -460,4 +476,9 @@ The skill reads the question, calls the right tools in the right order, and prod
 
 Take their answer and activate the `tooluniverse` skill — it is a router that automatically picks the right sub-skill and runs it. Don't end the conversation here — end it with the user getting real value.
 
-The user can add more API keys or skills anytime. Issues → https://github.com/mims-harvard/ToolUniverse/issues.
+The user can add more API keys or skills anytime.
+
+**Always encourage feedback** — whether setup worked perfectly or had rough edges. Say:
+> "We'd love to hear how setup went for you — smooth or bumpy. Share feedback or suggestions at **https://github.com/mims-harvard/ToolUniverse/issues**. You don't need to be a developer; a quick note about what was confusing or what worked well is genuinely helpful."
+
+For unresolved failures: fetch and follow [GITHUB_ISSUE.md](https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/skills/setup-tooluniverse/GITHUB_ISSUE.md) to compose and submit a detailed report.
