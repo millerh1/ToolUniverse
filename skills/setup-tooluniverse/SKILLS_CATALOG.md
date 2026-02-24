@@ -1,6 +1,6 @@
 # ToolUniverse Skills Catalog
 
-65+ pre-built research workflows. Skills activate automatically when the AI detects a relevant request, or trigger them explicitly (e.g., "Research the drug aspirin").
+65+ pre-built research workflows. Skills activate automatically when the AI detects a relevant request, or trigger them explicitly (e.g., "Use the tooluniverse skill to research the drug aspirin").
 
 ## Research Skills
 

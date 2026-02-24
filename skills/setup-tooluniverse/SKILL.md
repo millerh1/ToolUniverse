@@ -380,7 +380,7 @@ If all ✅, celebrate! 🎉 If any ❌, jump to the matching issue in [TROUBLESH
 
 **Say this to the user** (adapt to their language and research interest from Step 4):
 
-> "One more required step — installing ToolUniverse's 65+ research skills. Instead of calling tools manually, you just say 'Research the drug metformin' or 'What genes are associated with type 2 diabetes?' and the right skill runs automatically. This takes under a minute."
+> "One more required step — installing ToolUniverse's 65+ research skills. Instead of calling tools manually, you just say 'Use the tooluniverse skill to research the drug metformin' or 'Use the tooluniverse skill to find genes associated with type 2 diabetes' and the right skill runs automatically. This takes under a minute."
 
 **Option A — User runs in terminal (quickest, cross-platform):**
 ```bash
@@ -462,11 +462,11 @@ Skills activate automatically — the user just writes a natural language reques
 
 | Say this… | What happens |
 |-----------|-------------|
-| `"Research the drug metformin"` | drug-research skill runs: identity, pharmacology, targets, safety, ADMET |
-| `"What is known about Alzheimer's disease?"` | disease-research skill runs: genetics, mechanisms, treatments, trials |
-| `"What are the known targets of imatinib?"` | target-research skill runs: structure, interactions, druggability |
-| `"What does the literature say about CRISPR in sickle cell?"` | literature-deep-research skill runs: PubMed search, evidence grading, synthesis |
-| `"Interpret the EGFR L858R mutation in lung cancer"` | cancer-variant-interpretation skill runs: clinical evidence, therapies, trials |
+| `"Use the tooluniverse skill to research the drug metformin"` | drug-research skill runs: identity, pharmacology, targets, safety, ADMET |
+| `"Use the tooluniverse skill to research Alzheimer's disease"` | disease-research skill runs: genetics, mechanisms, treatments, trials |
+| `"Use the tooluniverse skill to find known targets of imatinib"` | target-research skill runs: structure, interactions, druggability |
+| `"Use the tooluniverse skill to review literature on CRISPR in sickle cell"` | literature-deep-research skill runs: PubMed search, evidence grading, synthesis |
+| `"Use the tooluniverse skill to interpret EGFR L858R in lung cancer"` | cancer-variant-interpretation skill runs: clinical evidence, therapies, trials |
 
 The skill reads the question, calls the right tools in the right order, and produces a full evidence-graded report. The user doesn't need to know which skill to pick — just ask the question.
 
