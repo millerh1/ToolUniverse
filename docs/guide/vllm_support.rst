@@ -79,10 +79,10 @@ You can also configure vLLM directly in tool configs:
 
 **Note**: Still requires ``VLLM_SERVER_URL`` environment variable.
 
-Using with Space Configurations
---------------------------------
+Using with Profile Configurations
+----------------------------------
 
-In Space YAML files:
+In Profile YAML files:
 
 .. code-block:: yaml
 
@@ -100,7 +100,7 @@ Configuration Priority
 With ``env_override`` mode:
 1. Environment variables (highest)
 2. Tool configuration
-3. Space configuration
+3. Profile configuration
 4. Built-in defaults
 
 Troubleshooting
@@ -147,5 +147,5 @@ See Also
 --------
 
 * :doc:`openrouter_support` - Using OpenRouter as an LLM provider
-* :doc:`toolspace` - Space configurations with LLM settings
+* :doc:`toolspace` - Profile configurations with LLM settings
 * :doc:`agentic_tools_tutorial` - Complete guide to creating agentic tools

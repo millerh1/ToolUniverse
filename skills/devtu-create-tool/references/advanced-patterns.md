@@ -2,6 +2,220 @@
 
 This reference covers advanced patterns and techniques for ToolUniverse tool development.
 
+## Offline / Computational Tools
+
+Some tools require no network access at all — they perform purely local calculations using
+mathematical formulas, lookup tables, or parametric models.  These tools are faster, more
+reliable, and easier to test than API-backed tools.
+
+### Minimal Offline Tool Skeleton
+
+```python
+# my_calculator_tool.py
+import math
+from typing import Dict, Any, Optional
+from tooluniverse.base_tool import BaseTool
+from tooluniverse.tool_registry import register_tool
+
+@register_tool("MyCalculatorTool")
+class MyCalculatorTool(BaseTool):
+    """
+    Brief description.  Runs entirely offline — no network requests.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        fields = tool_config.get("fields", {})
+        self.operation = fields.get("operation", "default_op")
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            # operation can come from fields (set in JSON) or runtime arg
+            op = arguments.get("operation") or self.operation
+
+            def _get(key: str) -> Optional[float]:
+                val = arguments.get(key)
+                return float(val) if val is not None else None
+
+            x = _get("x")
+            if x is None:
+                return {"status": "error", "message": "Missing required parameter: x"}
+
+            result_value = x * 2          # your formula here
+
+            return {
+                "status": "success",
+                "data": {
+                    "operation": op,
+                    "result": result_value,
+                    "result_formatted": f"{result_value:.4g}",
+                },
+                "metadata": {
+                    "note": "Runs offline — no network request.",
+                    "formula": "result = x × 2",
+                },
+            }
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}
+        except Exception as e:
+            return {"status": "error", "message": f"Unexpected error: {str(e)}"}
+```
+
+Key rules for offline tools:
+- Return `{"status": "error", "message": "..."}` — use `"message"` (not `"error"`) to match the circuit plugin convention.
+- Include a `"metadata"` block that names the formula(s) used and notes "Runs offline".
+- Always `float(val)` when extracting numeric arguments from the dict (they may arrive as strings).
+- Use `ValueError` for domain validation; let the outer `except Exception` catch everything else.
+
+### SI Formatting Helper
+
+Include a local `_fmt_si()` helper in every offline calculation tool for consistent output:
+
+```python
+def _fmt_si(value: float, unit: str) -> str:
+    """Format a numeric value with SI prefix and unit label."""
+    abs_v = abs(value)
+    if abs_v == 0:
+        return f"0 {unit}"
+    if abs_v >= 1e9:  return f"{value / 1e9:.4g} G{unit}"
+    if abs_v >= 1e6:  return f"{value / 1e6:.4g} M{unit}"
+    if abs_v >= 1e3:  return f"{value / 1e3:.4g} k{unit}"
+    if abs_v >= 1:    return f"{value:.4g} {unit}"
+    if abs_v >= 1e-3: return f"{value * 1e3:.4g} m{unit}"
+    if abs_v >= 1e-6: return f"{value * 1e6:.4g} µ{unit}"
+    if abs_v >= 1e-9: return f"{value * 1e9:.4g} n{unit}"
+    return f"{value * 1e12:.4g} p{unit}"
+```
+
+Always include both the raw numeric field and a `_formatted` string sibling so LLMs can
+display human-readable values without reformatting:
+
+```python
+"data": {
+    "delay_ps": 34.0,
+    "delay_formatted": "34 ps",        # human-readable sibling
+    "frequency_Hz": 4.66e9,
+    "frequency_formatted": "4.66 GHz", # human-readable sibling
+}
+```
+
+### Technology-Node Lookup Tables
+
+Many chip-design quantities are tabulated per process node.  Use a `Dict[int, ...]` keyed
+by node in nm with a `_nearest_node()` helper that falls back to the closest entry:
+
+```python
+# Empirical FO4 delay values in ps, one per node
+_FO4_TABLE: Dict[int, float] = {
+    180: 250.0,
+    130: 170.0,
+    90:  115.0,
+    65:   80.0,
+    45:   55.0,
+    32:   40.0,
+    28:   34.0,
+    20:   26.0,
+    16:   20.0,
+    10:   15.0,
+    7:    11.0,
+}
+
+_SORTED_NODES = sorted(_FO4_TABLE.keys())
+
+def _nearest_node(node_nm: float) -> int:
+    """Return the nearest supported technology node for a given nm value."""
+    return min(_SORTED_NODES, key=lambda n: abs(n - node_nm))
+```
+
+When the user's requested node is not in the table, include a `"warning"` field (not an
+error) in the data dict and continue with the nearest match:
+
+```python
+nearest = _nearest_node(node_nm)
+fo4_ps  = _FO4_TABLE[nearest]
+
+warning = None
+if nearest != int(node_nm):
+    warning = (
+        f"Node {node_nm} nm not in table; "
+        f"using nearest supported node {nearest} nm."
+    )
+
+result = {
+    "node_nm": nearest,
+    "fo4_delay_ps": fo4_ps,
+    # ...
+}
+if warning:
+    result["warning"] = warning      # add only when needed
+```
+
+Also expose `"supported_nodes_nm": _SORTED_NODES` in the response so callers know which
+values are available without reading the source code.
+
+### Warning Fields vs Error Returns
+
+Use these two patterns consistently:
+
+| Situation | Pattern |
+|---|---|
+| Input is technically valid but uses a fallback (e.g. nearest node) | `data["warning"] = "..."` — return `status: success` |
+| Input violates a hard physical constraint (e.g. negative capacitance) | `raise ValueError("...")` — caught → `status: error, message: ...` |
+| A computed threshold is exceeded (e.g. ground bounce > 100 mV) | `data["warning"] = "..."` + `data["exceeds_threshold"] = True` — still `status: success` |
+
+Example — threshold warning pattern:
+
+```python
+THRESHOLD_V = 0.100  # 100 mV
+
+v_noise = L * n * di_dt   # computation
+exceeds = v_noise > THRESHOLD_V
+
+result = {
+    "ground_bounce_V":    v_noise,
+    "ground_bounce_mV":   v_noise * 1e3,
+    "exceeds_threshold":  exceeds,
+}
+if exceeds:
+    result["warning"] = (
+        f"Ground bounce {v_noise * 1e3:.1f} mV exceeds "
+        f"{THRESHOLD_V * 1e3:.0f} mV threshold."
+    )
+```
+
+### Multi-Operation Offline Tool (fields.operation dispatch)
+
+For tools that share the same physics domain but have multiple distinct computations,
+use the `fields.operation` dispatch pattern.  The JSON config stores the default operation
+in `"fields": { "operation": "op_name" }`, and the runtime argument can override it:
+
+```python
+# In JSON config (one entry per operation):
+{
+  "name": "Circuit_fo4_delay",
+  "type": "FO4DelayTool",
+  "fields": { "operation": "lookup" },    # default for this tool entry
+  ...
+}
+
+# In __init__:
+def __init__(self, tool_config):
+    super().__init__(tool_config)
+    self.operation = tool_config.get("fields", {}).get("operation", "lookup")
+
+# In run():
+op = arguments.get("operation") or self.operation   # runtime arg takes priority
+if op == "lookup":
+    ...
+elif op == "estimate_path":
+    ...
+else:
+    return {"status": "error", "message": f"Unknown operation '{op}'.  Valid: ..."}
+```
+
+This lets you expose a single Python class and multiple JSON entries (one per default
+operation) — or a single JSON entry that accepts the operation as a runtime argument.
+
 ## Caching Strategies
 
 ### Simple LRU Cache

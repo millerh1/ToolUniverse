@@ -38,14 +38,19 @@ def PROSITE_scan_sequence(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "sequence": sequence,
+                "skip_frequent": skip_frequent
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
         {
             "name": "PROSITE_scan_sequence",
-            "arguments": {"sequence": sequence, "skip_frequent": skip_frequent},
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

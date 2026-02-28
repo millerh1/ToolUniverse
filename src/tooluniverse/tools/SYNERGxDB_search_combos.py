@@ -53,22 +53,24 @@ def SYNERGxDB_search_combos(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "SYNERGxDB_search_combos",
-            "arguments": {
-                "operation": operation,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "operation": operation,
                 "drug_id_1": drug_id_1,
                 "drug_id_2": drug_id_2,
                 "sample": sample,
                 "dataset": dataset,
                 "page": page,
-                "per_page": per_page,
-            },
+                "per_page": per_page
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "SYNERGxDB_search_combos",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

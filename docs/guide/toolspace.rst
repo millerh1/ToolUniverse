@@ -1,237 +1,112 @@
-Space Configuration System
-==============================
+Profile & Workspace
+====================
 
-Space is a powerful configuration system that allows you to easily load, share, and manage tool configurations for ToolUniverse. It supports both simple presets and complex workspaces with AI integration.
+Two distinct concepts:
+
+- **Profile** (``profile.yaml``) — *what* to load: tools, cache settings, LLM config.
+- **Workspace** (``.tooluniverse/``) — *where* config and API keys live on disk.
 
 Quick Start
 -----------
 
-Load a Space configuration in just one line:
+.. code-block:: bash
 
-.. code-block:: python
+   mkdir .tooluniverse
+   echo "OPENAI_API_KEY=sk-..." > .tooluniverse/.env
 
-   from tooluniverse import ToolUniverse
-   
-   tu = ToolUniverse()
-   
-   # Load from local file
-   config = tu.load_space("./my-config.yaml")
-   
-   # Or load from GitHub
-   config = tu.load_space(
-       "https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/examples/spaces/protein-research.yaml"
-   )
+   cat > .tooluniverse/profile.yaml << 'EOF'
+   name: my-profile
+   tools:
+     categories: [literature, drug]
+   EOF
 
-Command Line Usage
-------------------
+   tu serve   # profile.yaml loads automatically
 
-Use Space configurations with MCP servers:
+Load a profile on the fly:
 
 .. code-block:: bash
 
-   # Load local file
-   tooluniverse-smcp-stdio --load "./my-config.yaml"
-   
-   # Load from GitHub
-   tooluniverse-smcp-stdio --load "https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/examples/spaces/protein-research.yaml"
+   tu serve --load ./life-science.yaml
 
-What is Space?
-------------------
+---
 
-Space is a unified system for managing tool configurations that supports:
+profile.yaml Reference
+-----------------------
 
-- **Presets**: Simple tool collections for specific domains
-- **Workspaces**: Complete environments with tools, AI config, and workflows
-- **Sharing**: Easy sharing via HuggingFace Hub, HTTP URLs, or local files
+.. code-block:: yaml
 
-Available Space Configurations
--------------------------------
+   name: my-profile         # required
+   version: "1.0"           # optional
+   description: "..."
 
-ToolUniverse provides pre-configured Space configurations for various research domains. All Spaces are available on GitHub and can be loaded directly via HTTP URLs.
+   tools:
+     categories: [literature, drug, gwas]
+     include_tools: [UniProt_search]
+     exclude_tools: [slow_tool]
 
-Domain-Specific Spaces
-~~~~~~~~~~~~~~~~~~~~~~
+   cache:
+     enabled: true
+     memory_size: 256
+     persist: true
+     ttl: 3600
 
-**Protein Research** (`protein-research.yaml`)
- Comprehensive tools for protein structure, function, and interaction research.
- Includes: UniProt, RCSB PDB, AlphaFold, HPA, InterPro, protein visualization
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/protein-research.yaml>`_
+   llm_config:
+     default_provider: CHATGPT
+     models:
+       default: gpt-4o
 
-**Genomics** (`genomics.yaml`)
- Tools for genomics and genetics research.
- Includes: GWAS, Ensembl, ClinVar, dbSNP, gnomAD, GTEx, ENCODE, GDC
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/genomics.yaml>`_
+   hooks:
+     - type: SummarizationHook
+       enabled: true
 
-**Bioinformatics** (`bioinformatics.yaml`)
- Bioinformatics analysis and pathway research tools.
- Includes: BLAST, Gene Ontology, KEGG, Reactome, Enrichr, HumanBase, WikiPathways
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/bioinformatics.yaml>`_
+   sources:
+     - hf:community/genomics-tools
+     - ./my-local-tools/
 
-**Structural Biology** (`structural-biology.yaml`)
- Protein and molecular structure analysis tools.
- Includes: RCSB PDB, AlphaFold, EMDB, 3D visualization
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/structural-biology.yaml>`_
+   extends: hf:community/base-bio-tools
 
-**Cheminformatics** (`cheminformatics.yaml`)
- Chemical compound research and ADMET prediction tools.
- Includes: PubChem, ChEMBL, ADMET AI, molecular visualization
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/cheminformatics.yaml>`_
+   log_level: WARNING
+   required_env:
+     - OPENAI_API_KEY
 
-**Disease Research** (`disease-research.yaml`)
- Disease research and target-disease association tools.
- Includes: OpenTargets, Monarch, disease target scoring, GWAS, HPA
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/disease-research.yaml>`_
+.. note::
+   Put API key *values* in ``.tooluniverse/.env``, not in profile.yaml.
 
-**Drug Discovery** (`drug-discovery.yaml`)
- Essential tools for drug discovery research.
- Includes: ChEMBL, Clinical Trials, OpenTargets, FDA, PubChem, DrugBank, ADMET AI
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/drug-discovery.yaml>`_
+---
 
-**Literature Search** (`literature-search.yaml`)
- Scientific literature search and analysis tools.
- Includes: EuropePMC, Semantic Scholar, PubTator, arXiv, Crossref, PubMed
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/literature-search.yaml>`_
+Workspace
+---------
 
-**Clinical Research** (`clinical-research.yaml`)
- Clinical research and regulatory affairs tools.
- Includes: Clinical Trials, FDA, Clinical Guidelines, Monarch, EFO, HPA
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/clinical-research.yaml>`_
+.. code-block:: text
 
-Comprehensive Workspace
-~~~~~~~~~~~~~~~~~~~~~~~
+   .tooluniverse/
+   ├── .env          ← API keys (add to .gitignore)
+   ├── profile.yaml  ← auto-loaded on startup
+   └── tools/        ← custom tool configs
 
-**Full Workspace** (`full-workspace.yaml`)
- Complete research environment with all major domains (449 tools from 32 categories).
- Includes: LLM configuration, hooks, comprehensive tool coverage
- `GitHub <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/full-workspace.yaml>`_
+.. code-block:: bash
 
-Loading Pre-configured Spaces
------------------------------
+   tu serve                          # local:  ./.tooluniverse/
+   tu serve --global                 # global: ~/.tooluniverse/
+   tu serve --workspace /path/to/ws  # explicit path
 
-All Space configurations can be loaded directly from GitHub or local files:
+Priority: ``--workspace`` → ``TOOLUNIVERSE_HOME`` → ``--global`` → ``./.tooluniverse/``
+
+**Python API:**
 
 .. code-block:: python
 
    from tooluniverse import ToolUniverse
-   
-   tu = ToolUniverse()
-   
-   # Load from GitHub raw URL
-   config = tu.load_space(
-       "https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/examples/spaces/protein-research.yaml"
-   )
-   
-   # Or download and load from local file
-   config = tu.load_space("./examples/spaces/protein-research.yaml")
-   
-   # Use the loaded tools
-   print(f"Loaded {len(tu.all_tools)} tools from {config.get('name')}")
 
-For more details and configuration options, see `examples/spaces/README.md <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/README.md>`_.
+   tu = ToolUniverse()                              # local workspace
+   tu = ToolUniverse(use_global=True)               # global workspace
+   tu = ToolUniverse(workspace="/path/to/ws")       # explicit path
+   tu = ToolUniverse(profile="./life-science.yaml") # load profile
 
-Creating Your Own Space
-------------------------
+---
 
-You can create custom Space configurations by creating a YAML file:
+Merging
+-------
 
-.. code-block:: yaml
-
-   name: "My Research Toolkit"
-   version: "1.0.0"
-   description: "Tools for my research"
-   
-   tools:
-     include_tools:
-       - "UniProt_get_entry_by_accession"
-       - "gwas_search_associations"
-       - "PubChem_get_CID_by_compound_name"
-
-Then load it:
-
-.. code-block:: python
-
-   tu = ToolUniverse()
-   config = tu.load_space("./my-research-toolkit.yaml")
-
-For more examples and detailed configuration options, see `examples/spaces/README.md <https://github.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/README.md>`_.
-
-Configuration File Structure
------------------------------
-
-Here's a complete example with all available fields explained:
-
-.. code-block:: yaml
-
-   # Required fields
-   name: "My Research Workspace"        # Space name (required)
-   version: "1.0.0"                     # Version number (required)
-   
-   # Optional metadata
-   description: "Complete research environment"  # Description of this Space
-   tags: ["research", "custom"]         # Keywords for categorization
-   
-   # Tool configuration - choose one or combine methods
-   tools:
-     # Method 1: Explicit tool list (recommended for clarity)
-     include_tools:
-       - "UniProt_get_entry_by_accession"
-       - "gwas_search_associations"
-       - "PubChem_get_CID_by_compound_name"
-     
-     # Method 2: Load by categories (convenience method)
-     # categories:
-     #   - "uniprot"
-     #   - "gwas"
-     #   - "pubchem"
-     
-     # Method 3: Include by tool type
-     # include_tool_types:
-     #   - "OpenTarget"
-     #   - "UniProtRESTTool"
-     
-     # Exclusions (works with any method above)
-     exclude_tools:                      # Exclude specific tools
-       - "old_tool_name"
-     # exclude_tool_types:               # Exclude by tool type
-     #   - "Unknown"
-   
-   # LLM configuration (optional, only needed for workspaces with AI agents)
-   llm_config:
-     mode: "default"                    # "default", "fallback", or "env_override"
-     default_provider: "CHATGPT"        # CHATGPT, GEMINI, OPENROUTER, or VLLM
-     models:
-       default: "gpt-4o"                # Model used by AgenticTools
-     temperature: 0.3                   # 0.0-2.0 range
-   
-   # For vLLM, also set: export VLLM_SERVER_URL="http://your-server:8000"
-   # See :doc:`vllm_support` for complete vLLM setup guide
-   
-   # Hooks for output processing (optional)
-   hooks:
-     - type: "SummarizationHook"        # Summarize long outputs
-       enabled: true
-       config:
-         max_length: 500
-         include_key_points: true
-     
-     - type: "FileSaveHook"             # Save outputs to files
-       enabled: true
-       config:
-         output_dir: "./outputs"
-         file_prefix: "analysis"
-   
-   # Environment variables documentation (optional, for reference only)
-   required_env:
-     - "AZURE_OPENAI_API_KEY"
-     - "AZURE_OPENAI_ENDPOINT"
-
-Creating Your Own Space
-------------------------
-
-1. Create a YAML file with the structure above
-2. Choose your tools using ``include_tools`` (recommended) or ``categories``
-3. Add LLM config and hooks if needed
-4. Validate: ``python -c "from tooluniverse.space import validate_yaml_file_with_schema; print(' Valid' if validate_yaml_file_with_schema('my-space.yaml')[0] else ' Invalid')"``
-5. Load: ``tu.load_space("./my-space.yaml")``
-
-See `examples/spaces/ <https://github.com/mims-harvard/ToolUniverse/tree/main/examples/spaces>`_ for more examples.
+When ``--load`` is used, your workspace ``profile.yaml`` is the base and the
+loaded file overrides only what it specifies.

@@ -10,7 +10,7 @@ from ._shared_client import get_shared_client
 
 def BioTools_get_tool(
     biotoolsID: str,
-    format: Optional[str] = "json",
+    format: Optional[str] = 'json',
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
@@ -38,14 +38,19 @@ def BioTools_get_tool(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "biotoolsID": biotoolsID,
+                "format": format
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
         {
             "name": "BioTools_get_tool",
-            "arguments": {"biotoolsID": biotoolsID, "format": format},
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

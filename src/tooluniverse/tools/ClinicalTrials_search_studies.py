@@ -56,19 +56,25 @@ def ClinicalTrials_search_studies(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v
+        for k, v in {
+            "query_cond": query_cond,
+            "query_intr": query_intr,
+            "query_term": query_term,
+            "filter_status": filter_status,
+            "filter_phase": filter_phase,
+            "filter_study_type": filter_study_type,
+            "page_size": page_size,
+            "next_page_token": next_page_token,
+        }.items()
+        if v is not None
+    }
     return get_shared_client().run_one_function(
         {
             "name": "ClinicalTrials_search_studies",
-            "arguments": {
-                "query_cond": query_cond,
-                "query_intr": query_intr,
-                "query_term": query_term,
-                "filter_status": filter_status,
-                "filter_phase": filter_phase,
-                "filter_study_type": filter_study_type,
-                "page_size": page_size,
-                "next_page_token": next_page_token,
-            },
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

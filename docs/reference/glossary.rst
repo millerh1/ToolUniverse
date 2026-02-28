@@ -42,9 +42,9 @@ Technical terms and concepts used throughout ToolUniverse documentation.
    Scientific Model Context Protocol
       ToolUniverse's implementation of MCP, optimized for scientific workflows. Extends standard MCP with scientific domain features, intelligent tool discovery, and hooks system.
 
-   Space
+   Profile
    Toolspace
-      Pre-configured collection of tools for specific research domains (e.g., "proteomics-toolkit", "drug-discovery"). Spaces can be loaded from GitHub, local files, or URLs using ``--load`` parameter.
+      YAML configuration file (``profile.yaml``) declaring which tools to load, cache settings, LLM config, and hooks. Profiles can be loaded from GitHub, local files, or URLs using ``--load`` parameter.
 
    STDIO Transport
       Communication method where data flows through standard input/output streams. Used by desktop applications like Claude Desktop to communicate with MCP servers.
@@ -63,7 +63,7 @@ Technical terms and concepts used throughout ToolUniverse documentation.
       JSON definition describing a tool's purpose, input parameters, output format, and execution details. Think of it as the "instruction manual" for each tool.
 
    ToolSpace
-      See :term:`Space`.
+      See :term:`Profile`.
 
    PubChem CID
       PubChem Compound Identifier - unique numerical ID for chemical compounds in PubChem database (e.g., CID 2244 for aspirin).
@@ -95,7 +95,7 @@ Technical terms and concepts used throughout ToolUniverse documentation.
       Unique hash computed from tool's source code and parameter schema. When tool implementation changes, fingerprint changes, invalidating old cache entries.
 
    Workspace Configuration
-      YAML or JSON file defining tool selection, hooks, and settings for a specific research workflow or domain. See :term:`Space`.
+      YAML or JSON file defining tool selection, hooks, and settings for a specific research workflow or domain. See :term:`Profile`.
 
    JSON-RPC
       Remote Procedure Call protocol using JSON for data encoding. Some MCP servers use JSON-RPC for communication.

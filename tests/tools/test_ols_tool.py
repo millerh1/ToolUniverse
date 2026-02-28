@@ -701,9 +701,13 @@ class TestGetJSON:
 
     @patch.object(requests.Session, "get")
     def test_get_json_http_error(self, mock_get):
-        """Test _get_json handles HTTP errors."""
+        """Test _get_json handles HTTP errors.
+
+        _get_json catches all RequestException subclasses (including HTTPError)
+        and re-raises them as plain RequestException with added context.
+        """
         mock_get.side_effect = requests.HTTPError("404 Not Found")
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(requests.RequestException):
             self.tool._get_json("/invalid")
 
 

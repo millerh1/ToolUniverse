@@ -1,9 +1,9 @@
 """
-Space Configuration Validator
+Profile Configuration Validator
 
-Comprehensive validation for Space configurations using JSON Schema.
+Comprehensive validation for Profile configurations using JSON Schema.
 Supports validation, default value filling, and structure checking for
-Space YAML files.
+Profile YAML files.
 
 The validation system is based on a comprehensive JSON Schema that defines:
 - All possible fields and their types
@@ -24,52 +24,36 @@ import yaml
 import jsonschema
 from jsonschema import validate
 
-
-# Space JSON Schema Definition
-# ================================
-# This schema defines the complete structure and validation rules for
-# Space configurations. It serves as the single source of truth for:
-# - Field definitions and types
-# - Default values
-# - Required fields
-# - Validation constraints
-# - Enum values for specific fields
-#
-# The schema supports two main configuration types:
-# 1. Simple tool collections (e.g., literature-search.yaml) - minimal config
-# 2. Complete workspaces (e.g., full-workspace.yaml) - full config with LLM
-#
-# Key features:
-# - Automatic default value filling
-# - Comprehensive validation rules
-# - Support for nested objects and arrays
-# - Flexible tool selection (by name, category, type)
-# - LLM configuration with provider and model settings
-# - Hook system for output processing
-# - Environment variable requirements documentation
-SPACE_SCHEMA = {
+PROFILE_SCHEMA = {
     "type": "object",
     "properties": {
         "name": {
             "type": "string",
-            "description": "Space name - unique identifier for this configuration",
+            "description": "Profile name - unique identifier for this configuration",
+        },
+        "extends": {
+            "type": "string",
+            "description": "Base Profile URI to inherit from before applying this config "
+            '(e.g., "hf:community/base-bio-tools", "./base.yaml"). '
+            "Tool selection and settings from the base are merged, with this "
+            "config taking precedence on any conflicts.",
         },
         "version": {
             "type": "string",
             "default": "1.0.0",
-            "description": "Space version - follows semantic versioning "
+            "description": "Profile version - follows semantic versioning "
             "(e.g., 1.0.0, 1.2.3)",
         },
         "description": {
             "type": "string",
-            "description": "Space description - explains what this "
+            "description": "Profile description - explains what this "
             "configuration does and its purpose",
         },
         "tags": {
             "type": "array",
             "items": {"type": "string"},
             "default": [],
-            "description": "Space tags - keywords for categorization and "
+            "description": "Profile tags - keywords for categorization and "
             'discovery (e.g., ["research", "biology", "literature"])',
         },
         "tools": {
@@ -106,7 +90,6 @@ SPACE_SCHEMA = {
                     "specific types from the selection",
                 },
             },
-            "additionalProperties": False,
             "description": "Tool configuration - defines which tools to load "
             "and how to filter them",
         },
@@ -142,7 +125,6 @@ SPACE_SCHEMA = {
                     "responses (0.0 = deterministic, 2.0 = very random)",
                 },
             },
-            "additionalProperties": False,
             "description": "LLM configuration - settings for AI-powered tools "
             "(AgenticTool) - only needed for complete workspaces",
         },
@@ -169,7 +151,6 @@ SPACE_SCHEMA = {
                     },
                 },
                 "required": ["type"],
-                "additionalProperties": False,
             },
             "description": "Hook configurations - post-processing functions for "
             "tool outputs (e.g., summarization, file saving)",
@@ -181,11 +162,54 @@ SPACE_SCHEMA = {
             "environment variables should be set (for documentation "
             "purposes only)",
         },
+        "sources": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": [],
+            "description": "External tool sources to load in addition to built-in "
+            "tools and the workspace. Each entry is a URI that resolves to a "
+            "Profile-compatible directory (local path, hf:user/repo, or "
+            "https://... URL). Tools from sources are loaded after workspace "
+            "tools; last-seen definition wins for duplicate tool names.",
+        },
+        "log_level": {
+            "type": "string",
+            "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            "description": "Log level for this ToolUniverse session. Overrides "
+            "the global log level setting.",
+        },
+        "cache": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable or disable result caching entirely.",
+                },
+                "ttl": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Default time-to-live for cached results in seconds. "
+                    "0 means cache forever.",
+                },
+                "memory_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of results to keep in the in-memory "
+                    "LRU cache.",
+                },
+                "persist": {
+                    "type": "boolean",
+                    "description": "Whether to persist the cache to disk (SQLite). "
+                    "Useful for sharing results across sessions.",
+                },
+            },
+            "description": "Cache configuration. Controls how tool results are cached "
+            "to avoid redundant API calls.",
+        },
     },
-    "required": ["name", "version"],
-    "additionalProperties": False,
-    "description": "Space Configuration Schema - defines the structure for "
-    "Space YAML configuration files",
+    "required": ["name"],
+    "description": "Profile Configuration Schema - defines the structure for "
+    "Profile YAML configuration files",
 }
 
 
@@ -193,9 +217,9 @@ class ValidationError(Exception):
     """Raised when configuration validation fails."""
 
 
-def validate_space_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_profile_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """
-    Validate a Space configuration using JSON Schema.
+    Validate a Profile configuration using JSON Schema.
 
     This is a legacy function that now uses the JSON Schema validation system.
     For new code, use validate_with_schema() instead.
@@ -217,7 +241,7 @@ def validate_yaml_format_by_template(yaml_content: str) -> Tuple[bool, List[str]
     Validate YAML format by comparing against default template format.
 
     This method uses the JSON Schema as a reference to validate
-    the structure and content of Space YAML configurations.
+    the structure and content of Profile YAML configurations.
 
     Args:
         yaml_content: YAML content string
@@ -306,12 +330,13 @@ def validate_with_schema(
         if not isinstance(config, dict):
             return False, ["YAML content must be a dictionary"], {}
 
-        # Fill default values if requested
-        if fill_defaults_flag:
-            config = fill_defaults(config, SPACE_SCHEMA)
+        # Validate required fields before filling defaults so that missing
+        # required keys (e.g. "name") are caught rather than silently injected.
+        validate(instance=config, schema=PROFILE_SCHEMA)
 
-        # Validate against schema
-        validate(instance=config, schema=SPACE_SCHEMA)
+        # Fill default values if requested (after validation)
+        if fill_defaults_flag:
+            config = fill_defaults(config, PROFILE_SCHEMA)
 
         return True, [], config
 

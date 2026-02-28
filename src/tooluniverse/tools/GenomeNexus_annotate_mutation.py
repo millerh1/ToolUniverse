@@ -47,20 +47,22 @@ def GenomeNexus_annotate_mutation(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "GenomeNexus_annotate_mutation",
-            "arguments": {
-                "chromosome": chromosome,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "chromosome": chromosome,
                 "start": start,
                 "end": end,
                 "reference_allele": reference_allele,
-                "variant_allele": variant_allele,
-            },
+                "variant_allele": variant_allele
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "GenomeNexus_annotate_mutation",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

@@ -128,6 +128,9 @@ space = [
 bioinformatics = [
     "biopython>=1.80",
 ]
+circuit = [
+    "tooluniverse-circuit @ git+https://github.com/tooluniverse/circuit.git",
+]
 all = [
     "tooluniverse[dev,docs,graph,visualization,space,embedding,ml,bioinformatics]",
 ]
@@ -139,6 +142,7 @@ build = [
 Homepage = "https://github.com/mims-harvard/ToolUniverse"
 
 [project.scripts]
+tu = "tooluniverse.cli:main"
 tooluniverse = "tooluniverse.smcp_server:run_default_stdio_server"
 tooluniverse-mcp = "tooluniverse.smcp_server:run_http_server"
 tooluniverse-smcp = "tooluniverse.smcp_server:run_smcp_server"

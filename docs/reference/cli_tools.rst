@@ -45,7 +45,7 @@ Start the Scientific Model Context Protocol (SMCP) server with HTTP/SSE transpor
      - Enable output processing hooks
    * - ``--load``
      - None
-     - Load space configuration (preset/workspace)
+     - Load profile configuration (preset/workspace)
 
 **Examples**::
 

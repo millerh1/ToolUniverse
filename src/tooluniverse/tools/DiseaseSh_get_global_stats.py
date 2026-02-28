@@ -9,6 +9,7 @@ from ._shared_client import get_shared_client
 
 
 def DiseaseSh_get_global_stats(
+    
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
@@ -33,11 +34,18 @@ def DiseaseSh_get_global_stats(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
-        {"name": "DiseaseSh_get_global_stats", "arguments": {}},
+        {
+            "name": "DiseaseSh_get_global_stats",
+            "arguments": _args,
+        },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

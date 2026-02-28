@@ -50,21 +50,23 @@ def EOL_get_page(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "EOL_get_page",
-            "arguments": {
-                "page_id": page_id,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "page_id": page_id,
                 "images_per_page": images_per_page,
                 "texts_per_page": texts_per_page,
                 "common_names": common_names,
                 "synonyms": synonyms,
-                "details": details,
-            },
+                "details": details
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "EOL_get_page",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

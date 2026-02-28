@@ -418,6 +418,8 @@ default_tool_files = {
     "cath": os.path.join(current_dir, "data", "cath_tools.json"),
     # MeSH - Medical Subject Headings (NLM controlled vocabulary for PubMed indexing)
     "mesh": os.path.join(current_dir, "data", "mesh_tools.json"),
+    # JLCSearch and DigiKey have moved to tooluniverse-circuit sub-package.
+    # Install with: pip install tooluniverse[circuit]
     # HPO - Human Phenotype Ontology (phenotype terms, hierarchy, clinical genetics)
     "hpo": os.path.join(current_dir, "data", "hpo_tools.json"),
     # Reactome Analysis Service - Pathway enrichment/overrepresentation analysis

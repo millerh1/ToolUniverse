@@ -1,0 +1,2311 @@
+"""
+Comprehensive tests for the `tu` CLI (tooluniverse.cli module).
+
+Strategy
+--------
+* Fast tests (the majority) call CLI handler functions directly with
+  monkeypatched ``_get_tu()``, capturing output via pytest's ``capsys``.
+* Slow subprocess tests verify real end-to-end output format and the
+  stdout/stderr separation that only works correctly in a child process.
+
+Coverage
+--------
+  A. tu list  — all modes, limit/offset pagination, categories filter
+  B. tu grep  — text/regex search, fields, edge cases
+  C. tu info  — single / batch, detail levels, nonexistent tool
+  D. tu find  — keyword search, empty / unicode queries
+  E. tu run   — execute_tool mirroring, no-args fix, invalid JSON, key=value
+  F. tu status
+  G. tu build
+  H. argparse / error-handling
+  I. Output format (JSON validity, raw vs pretty, human-readable)
+  J. Subprocess / pipe integration
+  K. Render function smoke tests
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+# Ensure src is importable when tests run without editable install
+_SRC = str(Path(__file__).resolve().parents[2] / "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+
+# ── shared fixtures ────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def tu():
+    """Single ToolUniverse instance, loaded once per test session."""
+    from tooluniverse import ToolUniverse
+
+    instance = ToolUniverse()
+    instance.load_tools()
+    return instance
+
+
+# ── helpers ────────────────────────────────────────────────────────────────────
+
+
+def _args(**kw) -> argparse.Namespace:
+    """Return an argparse.Namespace with sane defaults plus overrides."""
+    defaults = dict(
+        raw=False,
+        json=False,
+        mode=None,
+        categories=None,
+        fields=None,
+        limit=None,
+        offset=0,
+        group_by_category=False,
+        pattern="",
+        field="name",
+        search_mode="text",
+        tool_names=[],
+        detail="full",
+        query="",
+        tool_name="",
+        arguments=[],
+        output=None,
+    )
+    defaults.update(kw)
+    return argparse.Namespace(**defaults)
+
+
+def _run(monkeypatch, fn, ns, tu_fixture, capsys):
+    """
+    Call a CLI handler function with _get_tu monkeypatched.
+    Returns (stdout_text, stderr_text).
+    """
+    import tooluniverse.cli as m
+
+    monkeypatch.setattr(m, "_get_tu", lambda: tu_fixture)
+    fn(ns)
+    cap = capsys.readouterr()
+    return cap.out, cap.err
+
+
+def _j(s: str):
+    """Parse JSON; raise AssertionError with context on failure."""
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            f"Expected valid JSON but got:\n{repr(s[:400])}"
+        ) from exc
+
+
+def _cli(*args, timeout: int = 120) -> tuple[int, str, str]:
+    """Run tu CLI as a subprocess. Returns (returncode, stdout, stderr)."""
+    env = {**os.environ, "PYTHONPATH": _SRC, "TOOLUNIVERSE_STDIO_MODE": "1"}
+    r = subprocess.run(
+        [sys.executable, "-m", "tooluniverse.cli", *args],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
+    return r.returncode, r.stdout, r.stderr
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A. tu list
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestList:
+    """Tests for the `tu list` subcommand."""
+
+    @pytest.mark.unit
+    def test_list_default_names_mode(self, monkeypatch, tu, capsys):
+        """Explicit names mode returns list of tool name strings."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="names", limit=10, json=True), tu, capsys)
+        d = _j(out)
+        assert d["total_tools"] >= 100
+        assert isinstance(d["tools"], list)
+        assert all(isinstance(t, str) for t in d["tools"])
+        assert len(d["tools"]) == 10
+
+    @pytest.mark.unit
+    def test_list_mode_categories(self, monkeypatch, tu, capsys):
+        """Categories mode returns a dict of category_name → count."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="categories", json=True), tu, capsys)
+        d = _j(out)
+        assert "categories" in d
+        assert isinstance(d["categories"], dict)
+        assert len(d["categories"]) >= 10
+        assert all(isinstance(v, int) for v in d["categories"].values())
+
+    @pytest.mark.unit
+    def test_list_mode_basic_fields(self, monkeypatch, tu, capsys):
+        """Basic mode returns tools with name + description."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="basic", limit=5, json=True), tu, capsys)
+        d = _j(out)
+        assert d["total_tools"] >= 100
+        for tool in d["tools"]:
+            assert "name" in tool
+            assert "description" in tool
+
+    @pytest.mark.unit
+    def test_list_mode_summary_fields(self, monkeypatch, tu, capsys):
+        """Summary mode returns tools with name, description, type, has_parameters."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="summary", limit=5, json=True), tu, capsys)
+        d = _j(out)
+        for tool in d["tools"]:
+            assert "name" in tool
+            assert "description" in tool
+            assert "type" in tool
+            assert "has_parameters" in tool
+
+    @pytest.mark.unit
+    def test_list_mode_by_category(self, monkeypatch, tu, capsys):
+        """By-category mode returns tools_by_category dict."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="by_category", json=True), tu, capsys)
+        d = _j(out)
+        assert "tools_by_category" in d
+        assert isinstance(d["tools_by_category"], dict)
+        # Each value must be a list of tool-name strings
+        for cat_tools in d["tools_by_category"].values():
+            assert isinstance(cat_tools, list)
+
+    @pytest.mark.unit
+    def test_list_limit_and_has_more(self, monkeypatch, tu, capsys):
+        """limit=5 returns exactly 5 tools and has_more=True when total > 5."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="names", limit=5, json=True), tu, capsys)
+        d = _j(out)
+        assert len(d["tools"]) == 5
+        if d["total_tools"] > 5:
+            assert d["has_more"] is True
+        assert d["limit"] == 5
+
+    @pytest.mark.unit
+    def test_list_offset_pagination(self, monkeypatch, tu, capsys):
+        """Two consecutive pages are disjoint."""
+        from tooluniverse.cli import cmd_list
+
+        out1, _ = _run(
+            monkeypatch, cmd_list, _args(mode="names", limit=5, offset=0, json=True), tu, capsys
+        )
+        out2, _ = _run(
+            monkeypatch, cmd_list, _args(mode="names", limit=5, offset=5, json=True), tu, capsys
+        )
+        page1 = set(_j(out1)["tools"])
+        page2 = set(_j(out2)["tools"])
+        assert page1.isdisjoint(page2)
+
+    @pytest.mark.unit
+    def test_list_categories_filter(self, monkeypatch, tu, capsys):
+        """--categories filters to a strict subset of all tools."""
+        from tooluniverse.cli import cmd_list
+
+        out_filtered, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", categories=["uniprot"], limit=999999, json=True),
+            tu,
+            capsys,
+        )
+        out_all, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", limit=999999, json=True),
+            tu,
+            capsys,
+        )
+        d_filtered = _j(out_filtered)
+        d_all = _j(out_all)
+        assert d_filtered["total_tools"] >= 1
+        # Filtered count must be strictly less than unfiltered
+        assert d_filtered["total_tools"] < d_all["total_tools"]
+
+    @pytest.mark.unit
+    def test_list_nonexistent_category(self, monkeypatch, tu, capsys):
+        """Unknown category returns empty results, no error."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", categories=["ZZZNOMATCH_CATEGORY_9999"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_tools"] == 0
+        assert d["tools"] == []
+        assert "error" not in d
+
+    @pytest.mark.unit
+    def test_list_offset_beyond_end_returns_empty(self, monkeypatch, tu, capsys):
+        """Offset beyond total returns empty list but total_tools is accurate."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(
+            monkeypatch, cmd_list, _args(mode="names", limit=10, offset=999999, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert d["tools"] == []
+        assert d["has_more"] is False
+        assert d["total_tools"] >= 100  # total is still accurate
+
+    @pytest.mark.unit
+    def test_list_custom_mode_with_fields(self, monkeypatch, tu, capsys):
+        """Custom mode with --fields returns only those fields."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="custom", fields=["name", "type"], limit=5, json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "tools" in d
+        for tool in d["tools"]:
+            assert "name" in tool
+            assert "type" in tool
+            # description should NOT be present (not in fields)
+            assert "description" not in tool
+
+    @pytest.mark.unit
+    def test_list_custom_mode_no_fields_returns_error(self, monkeypatch, tu, capsys):
+        """Custom mode without --fields returns an error response."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(
+            monkeypatch, cmd_list, _args(mode="custom", fields=None, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_list_raw_output_is_compact(self, monkeypatch, tu, capsys):
+        """--raw produces single-line JSON (no indent)."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="names", limit=3, raw=True), tu, capsys)
+        # Raw output must be parseable JSON on one (logical) line
+        d = _j(out)
+        assert d["total_tools"] >= 100
+        # Should not have "\n  " which is the 2-space indentation
+        assert "\n  " not in out
+
+    @pytest.mark.unit
+    def test_list_pretty_output_is_indented(self, monkeypatch, tu, capsys):
+        """--json produces pretty-printed output with indentation."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="names", limit=3, json=True), tu, capsys)
+        assert "\n  " in out  # 2-space indentation present
+
+    @pytest.mark.unit
+    def test_list_multiple_categories(self, monkeypatch, tu, capsys):
+        """Multiple categories in filter — tools from any listed category returned."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", categories=["UniProt", "ChEMBL"], limit=50, json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_tools"] >= 2
+
+    @pytest.mark.unit
+    def test_list_categories_mode_has_no_pagination_keys(self, monkeypatch, tu, capsys):
+        """Categories mode only has 'categories' key (no total_tools/has_more)."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="categories", json=True), tu, capsys)
+        d = _j(out)
+        # categories mode returns a dict with only the categories key
+        assert "categories" in d
+        assert "total_tools" not in d
+
+    @pytest.mark.unit
+    def test_list_smart_default_no_filter_is_categories(self, monkeypatch, tu, capsys):
+        """Default mode (mode=None, no categories) uses categories mode internally."""
+        from tooluniverse.cli import cmd_list
+
+        # Verify via JSON that the response is a categories-mode dict
+        out, _ = _run(monkeypatch, cmd_list, _args(json=True), tu, capsys)
+        d = _j(out)
+        assert "categories" in d
+        assert "total_tools" not in d  # distinguishes categories mode from names mode
+
+    @pytest.mark.unit
+    def test_list_smart_default_with_filter_is_names(self, monkeypatch, tu, capsys):
+        """Default mode (mode=None) with --categories uses names mode internally."""
+        from tooluniverse.cli import cmd_list
+
+        # Verify via JSON that the response is a names-mode dict (has tools list)
+        out, _ = _run(
+            monkeypatch, cmd_list, _args(categories=["uniprot"], limit=5, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert "tools" in d
+        assert isinstance(d["tools"], list)
+        assert d["total_tools"] >= 1
+
+    @pytest.mark.unit
+    def test_list_case_insensitive_category(self, monkeypatch, tu, capsys):
+        """Category names are matched case-insensitively."""
+        from tooluniverse.cli import cmd_list
+
+        out_lower, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", categories=["uniprot"], json=True),
+            tu,
+            capsys,
+        )
+        out_upper, _ = _run(
+            monkeypatch,
+            cmd_list,
+            _args(mode="names", categories=["UniProt"], json=True),
+            tu,
+            capsys,
+        )
+        assert _j(out_lower)["total_tools"] == _j(out_upper)["total_tools"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# B. tu grep
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestGrep:
+    """Tests for the `tu grep` subcommand."""
+
+    @pytest.mark.unit
+    def test_grep_basic_match(self, monkeypatch, tu, capsys):
+        """Searching 'protein' in names returns matches with expected keys."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="protein", limit=10, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert d["total_matches"] > 0
+        assert "tools" in d
+        for tool in d["tools"]:
+            assert "name" in tool
+            assert "description" in tool
+
+    @pytest.mark.unit
+    def test_grep_field_description(self, monkeypatch, tu, capsys):
+        """Searching in description field finds tools with 'protein' in description."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="protein", field="description", limit=20, json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_matches"] > 0
+        for tool in d["tools"]:
+            assert "protein" in tool["description"].lower()
+
+    @pytest.mark.unit
+    def test_grep_field_type(self, monkeypatch, tu, capsys):
+        """Searching by type field returns matching tools."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="ListTools", field="type", json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_matches"] >= 1
+
+    @pytest.mark.unit
+    def test_grep_mode_regex_anchored(self, monkeypatch, tu, capsys):
+        """Regex mode: ^UniProt matches only tools whose name starts with UniProt."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="^UniProt", search_mode="regex", limit=50, json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_matches"] >= 1
+        for tool in d["tools"]:
+            assert tool["name"].startswith("UniProt")
+
+    @pytest.mark.unit
+    def test_grep_regex_invalid_pattern_returns_error(self, monkeypatch, tu, capsys):
+        """Invalid regex returns JSON with 'error' key (no crash, no sys.exit)."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="(invalid[regex", search_mode="regex", json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_grep_empty_pattern_returns_error(self, monkeypatch, tu, capsys):
+        """Empty string pattern returns error response."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(monkeypatch, cmd_grep, _args(pattern="", json=True), tu, capsys)
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_grep_no_matches(self, monkeypatch, tu, capsys):
+        """Pattern that matches nothing returns empty list, no error."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="ZZZNOMATCH_XYZ_9999", json=True), tu, capsys
+        )
+        d = _j(out)
+        assert d["total_matches"] == 0
+        assert d["tools"] == []
+        assert "error" not in d
+
+    @pytest.mark.unit
+    def test_grep_limit_controls_results(self, monkeypatch, tu, capsys):
+        """limit parameter caps the number of results returned."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="a", limit=7, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert len(d["tools"]) <= 7
+
+    @pytest.mark.unit
+    def test_grep_has_more_flag(self, monkeypatch, tu, capsys):
+        """has_more is True when total_matches > limit."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="a", limit=5, json=True), tu, capsys
+        )
+        d = _j(out)
+        if d["total_matches"] > 5:
+            assert d["has_more"] is True
+        else:
+            assert d["has_more"] is False
+
+    @pytest.mark.unit
+    def test_grep_offset_pagination(self, monkeypatch, tu, capsys):
+        """Two pages of grep results are disjoint."""
+        from tooluniverse.cli import cmd_grep
+
+        out1, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="a", limit=5, offset=0, json=True), tu, capsys
+        )
+        out2, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="a", limit=5, offset=5, json=True), tu, capsys
+        )
+        names1 = {t["name"] for t in _j(out1)["tools"]}
+        names2 = {t["name"] for t in _j(out2)["tools"]}
+        assert names1.isdisjoint(names2)
+
+    @pytest.mark.unit
+    def test_grep_case_insensitive_text_mode(self, monkeypatch, tu, capsys):
+        """Text-mode search is case-insensitive."""
+        from tooluniverse.cli import cmd_grep
+
+        out_lower, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="protein", json=True), tu, capsys
+        )
+        out_upper, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="PROTEIN", json=True), tu, capsys
+        )
+        # Both should return the same total matches count
+        assert _j(out_lower)["total_matches"] == _j(out_upper)["total_matches"]
+
+    @pytest.mark.unit
+    def test_grep_category_filter(self, monkeypatch, tu, capsys):
+        """categories filter restricts grep to those categories."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="a", categories=["ZZZNOMATCH_9999"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_matches"] == 0
+
+    @pytest.mark.unit
+    def test_grep_response_metadata(self, monkeypatch, tu, capsys):
+        """Grep response includes pattern, field, and search_mode metadata."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_grep,
+            _args(pattern="protein", field="name", search_mode="text", json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["pattern"] == "protein"
+        assert d["field"] == "name"
+        assert d["search_mode"] == "text"
+
+    @pytest.mark.unit
+    def test_grep_human_readable_default(self, monkeypatch, tu, capsys):
+        """Default output (no --json/--raw) is a human-readable table."""
+        from tooluniverse.cli import cmd_grep
+
+        out, _ = _run(
+            monkeypatch, cmd_grep, _args(pattern="protein", limit=3), tu, capsys
+        )
+        # _render_grep always emits a "name  description" header row
+        assert "name" in out
+        assert "description" in out
+        assert not out.strip().startswith("{")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# C. tu info
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestInfo:
+    """Tests for the `tu info` subcommand."""
+
+    @pytest.mark.unit
+    def test_info_single_existing_tool(self, monkeypatch, tu, capsys):
+        """Single existing tool returns its definition dict directly."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch, cmd_info, _args(tool_names=["list_tools"], json=True), tu, capsys
+        )
+        d = _j(out)
+        assert d["name"] == "list_tools"
+        assert "description" in d
+
+    @pytest.mark.unit
+    def test_info_full_detail_has_parameter_schema(self, monkeypatch, tu, capsys):
+        """Full detail includes parameter schema with type=object."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["list_tools"], detail="full", json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "parameter" in d
+        assert d["parameter"]["type"] == "object"
+        assert "properties" in d["parameter"]
+
+    @pytest.mark.unit
+    def test_info_description_detail_no_schema(self, monkeypatch, tu, capsys):
+        """Description detail returns only name + description (no parameter key)."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["list_tools"], detail="description", json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["name"] == "list_tools"
+        assert "description" in d
+        assert "parameter" not in d
+
+    @pytest.mark.unit
+    def test_info_nonexistent_tool_returns_error(self, monkeypatch, tu, capsys):
+        """Requesting info for a nonexistent tool returns an error dict."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["NONEXISTENT_TOOL_XYZ_99999"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_info_multiple_existing_tools(self, monkeypatch, tu, capsys):
+        """Batch info for multiple tools returns wrapped response."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["list_tools", "grep_tools"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_requested"] == 2
+        assert d["total_found"] == 2
+        assert len(d["tools"]) == 2
+        names = {t["name"] for t in d["tools"]}
+        assert "list_tools" in names
+        assert "grep_tools" in names
+
+    @pytest.mark.unit
+    def test_info_mixed_existing_nonexisting(self, monkeypatch, tu, capsys):
+        """Batch with one good + one bad tool: total_found=1."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["list_tools", "NONEXISTENT_TOOL_XYZ"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d["total_requested"] == 2
+        assert d["total_found"] == 1
+
+    @pytest.mark.unit
+    def test_info_single_passes_string_not_list(self, monkeypatch, tu, capsys):
+        """Single tool name is passed as string (not 1-element list) to get_tool_info."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_info,
+            _args(tool_names=["execute_tool"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        # Direct tool dict has 'name' at top level, not inside a 'tools' array
+        assert d.get("name") == "execute_tool"
+
+    @pytest.mark.unit
+    def test_info_human_readable_default(self, monkeypatch, tu, capsys):
+        """Default output is a human-readable tool card with name and description."""
+        from tooluniverse.cli import cmd_info
+
+        out, _ = _run(
+            monkeypatch, cmd_info, _args(tool_names=["list_tools"]), tu, capsys
+        )
+        # _render_info always emits the tool name on the first line
+        assert "list_tools" in out
+        # and its description indented below
+        assert "  " in out  # indented description line
+        assert not out.strip().startswith("{")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D. tu find
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestFind:
+    """Tests for the `tu find` subcommand (keyword search)."""
+
+    @pytest.mark.unit
+    def test_find_basic_query(self, monkeypatch, tu, capsys):
+        """Natural-language query returns relevant tools."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_find,
+            _args(query="protein structure analysis", limit=5, json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "tools" in d
+        assert len(d["tools"]) >= 1
+
+    @pytest.mark.unit
+    def test_find_limit_respected(self, monkeypatch, tu, capsys):
+        """--limit caps number of tools returned."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="gene expression", limit=3, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert len(d["tools"]) <= 3
+
+    @pytest.mark.unit
+    def test_find_empty_query_returns_error(self, monkeypatch, tu, capsys):
+        """Empty query string returns error response (no crash)."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="", json=True), tu, capsys
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_find_stopwords_only_returns_error(self, monkeypatch, tu, capsys):
+        """A query consisting only of stopwords returns error."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="the and for from", json=True), tu, capsys
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_find_nonexistent_category_returns_empty(self, monkeypatch, tu, capsys):
+        """Category filter with unknown category returns empty results."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_find,
+            _args(query="protein", categories=["ZZZNOMATCH_CAT_9999"], json=True),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert d.get("tools", []) == []
+
+    @pytest.mark.unit
+    def test_find_result_has_name_and_description(self, monkeypatch, tu, capsys):
+        """Each result in find has at minimum name and description fields."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="drug target", limit=3, json=True), tu, capsys
+        )
+        d = _j(out)
+        for tool in d.get("tools", []):
+            assert "name" in tool
+            assert "description" in tool
+
+    @pytest.mark.unit
+    def test_find_returns_tools_list(self, monkeypatch, tu, capsys):
+        """find with a specific scientific query returns a non-empty tools list."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="DNA methylation", limit=5, json=True), tu, capsys
+        )
+        d = _j(out)
+        assert "tools" in d
+        assert isinstance(d["tools"], list)
+        assert len(d["tools"]) >= 1
+
+    @pytest.mark.unit
+    def test_find_unicode_query_no_crash(self, monkeypatch, tu, capsys):
+        """Unicode query returns a valid JSON response without crashing."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="蛋白质结构", json=True), tu, capsys
+        )
+        d = _j(out)
+        # Must return either an error dict (no ASCII tokens) or a tools list
+        assert isinstance(d, dict)
+        assert "error" in d or "tools" in d
+
+    @pytest.mark.unit
+    def test_find_human_readable_default(self, monkeypatch, tu, capsys):
+        """Default output (no --json) is a human-readable results table."""
+        from tooluniverse.cli import cmd_find
+
+        out, _ = _run(
+            monkeypatch, cmd_find, _args(query="protein structure", limit=3), tu, capsys
+        )
+        # _render_find always ends with "\nN results"
+        assert "results" in out
+        assert not out.strip().startswith("{")
+
+    @pytest.mark.unit
+    def test_find_case_insensitive_category(self, monkeypatch, tu, capsys):
+        """Category names in cmd_find are matched case-insensitively."""
+        from tooluniverse.cli import cmd_find
+
+        out_lower, _ = _run(
+            monkeypatch,
+            cmd_find,
+            _args(query="protein", categories=["uniprot"], json=True),
+            tu,
+            capsys,
+        )
+        out_upper, _ = _run(
+            monkeypatch,
+            cmd_find,
+            _args(query="protein", categories=["UniProt"], json=True),
+            tu,
+            capsys,
+        )
+        d_lower = _j(out_lower)
+        d_upper = _j(out_upper)
+        # Both should return the same number of tools
+        assert d_lower.get("total_matches", 0) == d_upper.get("total_matches", 0)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# E. tu run
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRun:
+    """Tests for the `tu run` subcommand (mirrors execute_tool)."""
+
+    @pytest.mark.unit
+    def test_run_with_json_args(self, monkeypatch, tu, capsys):
+        """tu run list_tools with JSON args returns expected result."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=['{"mode": "categories"}']),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "categories" in d
+
+    @pytest.mark.unit
+    def test_run_no_args_succeeds(self, monkeypatch, tu, capsys):
+        """tu run <tool> with no arguments uses tool defaults (not schema error)."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=[]),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        # list_tools with defaults returns a categories or names response
+        assert "tools" in d or "categories" in d
+
+    @pytest.mark.unit
+    def test_run_empty_object_args(self, monkeypatch, tu, capsys):
+        """Empty JSON object '{}' is valid arguments (tool uses defaults)."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=["{}"] ),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "tools" in d or "categories" in d
+
+    @pytest.mark.unit
+    def test_run_invalid_json_exits_1(self, monkeypatch, tu, capsys):
+        """Invalid JSON in arguments triggers sys.exit(1)."""
+        from tooluniverse.cli import cmd_run
+
+        with pytest.raises(SystemExit) as exc_info:
+            _run(
+                monkeypatch,
+                cmd_run,
+                _args(tool_name="list_tools", arguments=["{not valid json}"]),
+                tu,
+                capsys,
+            )
+        assert exc_info.value.code == 1
+
+    @pytest.mark.unit
+    def test_run_invalid_json_error_to_stderr(self, monkeypatch, tu, capsys):
+        """JSON parse error message goes to stderr."""
+        from tooluniverse.cli import cmd_run
+
+        with pytest.raises(SystemExit):
+            _run(
+                monkeypatch,
+                cmd_run,
+                _args(tool_name="list_tools", arguments=["not json"]),
+                tu,
+                capsys,
+            )
+        cap = capsys.readouterr()
+        # cli.py prints: "Error: invalid arguments.\n  {exc}"
+        assert "Error" in cap.err
+
+    @pytest.mark.unit
+    def test_run_nonexistent_tool_returns_error_json(self, monkeypatch, tu, capsys):
+        """Running a nonexistent tool returns JSON with error (no crash)."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="ZZZNOMATCH_TOOL_99999", arguments=["{}"] ),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_run_grep_via_run(self, monkeypatch, tu, capsys):
+        """tu run grep_tools '{"pattern": "protein"}' works identically to tu grep."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(
+                tool_name="grep_tools",
+                arguments=['{"pattern": "protein", "limit": 5}'],
+            ),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "total_matches" in d
+        assert d["total_matches"] > 0
+
+    @pytest.mark.unit
+    def test_run_json_array_returns_error(self, monkeypatch, tu, capsys):
+        """JSON array as arguments is rejected by execute_tool with error."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=["[1, 2, 3]"]),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        # execute_tool rejects non-dict arguments
+        assert "error" in d
+
+    @pytest.mark.unit
+    def test_run_raw_output_compact(self, monkeypatch, tu, capsys):
+        """--raw produces compact single-line JSON."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(
+                tool_name="list_tools",
+                arguments=['{"mode": "categories"}'],
+                raw=True,
+            ),
+            tu,
+            capsys,
+        )
+        _j(out)  # must be valid JSON
+        assert "\n  " not in out
+
+    @pytest.mark.unit
+    def test_run_empty_list_treated_as_no_args(self, monkeypatch, tu, capsys):
+        """Empty list for arguments is treated as no args."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=[]),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        # Same as no args: list_tools returns categories or names response
+        assert "tools" in d or "categories" in d
+
+    @pytest.mark.unit
+    def test_run_key_value_single(self, monkeypatch, tu, capsys):
+        """tu run list_tools mode=categories via key=value syntax."""
+        from tooluniverse.cli import cmd_run
+
+        out, _ = _run(
+            monkeypatch,
+            cmd_run,
+            _args(tool_name="list_tools", arguments=["mode=categories"]),
+            tu,
+            capsys,
+        )
+        d = _j(out)
+        assert "categories" in d
+
+    @pytest.mark.unit
+    def test_run_key_value_int_coercion(self, monkeypatch, tu, capsys):
+        """key=value: numeric strings are coerced to int."""
+        from tooluniverse.cli import _parse_run_args
+
+        result = _parse_run_args(["limit=5", "offset=0"])
+        assert result == {"limit": 5, "offset": 0}
+        assert isinstance(result["limit"], int)
+
+    @pytest.mark.unit
+    def test_run_key_value_bool_coercion(self):
+        """key=value: 'true'/'false' → bool."""
+        from tooluniverse.cli import _parse_run_args
+
+        result = _parse_run_args(["group_by_category=true"])
+        assert result == {"group_by_category": True}
+        assert isinstance(result["group_by_category"], bool)
+
+    @pytest.mark.unit
+    def test_run_key_value_null_coercion(self):
+        """key=value: 'null' → None."""
+        from tooluniverse.cli import _parse_run_args
+
+        result = _parse_run_args(["fields=null"])
+        assert result == {"fields": None}
+
+    @pytest.mark.unit
+    def test_run_key_value_string_preserved(self):
+        """key=value: non-numeric strings stay as strings."""
+        from tooluniverse.cli import _parse_run_args
+
+        result = _parse_run_args(["mode=categories", "pattern=foo"])
+        assert result == {"mode": "categories", "pattern": "foo"}
+
+    @pytest.mark.unit
+    def test_run_key_value_missing_equals_exits_1(self, monkeypatch, tu, capsys):
+        """key=value: token without '=' triggers sys.exit(1)."""
+        from tooluniverse.cli import cmd_run
+
+        with pytest.raises(SystemExit) as exc_info:
+            _run(
+                monkeypatch,
+                cmd_run,
+                _args(tool_name="list_tools", arguments=["notakeyvaluepair"]),
+                tu,
+                capsys,
+            )
+        assert exc_info.value.code == 1
+
+    @pytest.mark.unit
+    def test_parse_run_args_empty(self):
+        """_parse_run_args([]) returns None."""
+        from tooluniverse.cli import _parse_run_args
+
+        assert _parse_run_args([]) is None
+
+    @pytest.mark.unit
+    def test_parse_run_args_empty_key_raises(self):
+        """_parse_run_args(['=value']) raises ValueError for empty key."""
+        from tooluniverse.cli import _parse_run_args
+
+        with pytest.raises(ValueError, match="empty parameter name"):
+            _parse_run_args(["=value"])
+
+    @pytest.mark.unit
+    def test_parse_run_args_whitespace_key_raises(self):
+        """_parse_run_args(['  =value']) raises ValueError (whitespace-only key)."""
+        from tooluniverse.cli import _parse_run_args
+
+        with pytest.raises(ValueError, match="empty parameter name"):
+            _parse_run_args(["  =value"])
+
+    @pytest.mark.unit
+    def test_parse_run_args_json_string(self):
+        """_parse_run_args(['{"k":"v"}']) parses JSON."""
+        from tooluniverse.cli import _parse_run_args
+
+        result = _parse_run_args(['{"k": "v"}'])
+        assert result == {"k": "v"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# F. tu status
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestStatus:
+    """Tests for the `tu status` subcommand."""
+
+    @pytest.mark.unit
+    def test_status_keys_present(self, monkeypatch, tu, capsys):
+        """Status JSON response has all required keys."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(json=True), tu, capsys)
+        d = _j(out)
+        for key in ("tools_loaded", "categories", "workspace", "profile_active", "top_categories"):
+            assert key in d, f"Missing key: {key}"
+
+    @pytest.mark.unit
+    def test_status_tools_loaded_count(self, monkeypatch, tu, capsys):
+        """tools_loaded is a positive integer matching loaded tools."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(json=True), tu, capsys)
+        d = _j(out)
+        assert isinstance(d["tools_loaded"], int)
+        assert d["tools_loaded"] >= 100
+
+    @pytest.mark.unit
+    def test_status_workspace_is_string(self, monkeypatch, tu, capsys):
+        """workspace field is a non-empty string path."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(json=True), tu, capsys)
+        d = _j(out)
+        assert isinstance(d["workspace"], str)
+        assert len(d["workspace"]) > 0
+
+    @pytest.mark.unit
+    def test_status_profile_active_is_bool(self, monkeypatch, tu, capsys):
+        """profile_active field is a boolean."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(json=True), tu, capsys)
+        d = _j(out)
+        assert isinstance(d["profile_active"], bool)
+
+    @pytest.mark.unit
+    def test_status_top_categories_max_10(self, monkeypatch, tu, capsys):
+        """top_categories contains at most 10 entries."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(json=True), tu, capsys)
+        d = _j(out)
+        assert len(d["top_categories"]) <= 10
+        assert all(isinstance(v, int) for v in d["top_categories"].values())
+
+    @pytest.mark.unit
+    def test_status_raw_single_line(self, monkeypatch, tu, capsys):
+        """--raw produces compact single-line JSON."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(raw=True), tu, capsys)
+        _j(out)
+        assert "\n  " not in out
+
+    @pytest.mark.unit
+    def test_status_human_readable_default(self, monkeypatch, tu, capsys):
+        """Default output is human-readable key-value pairs."""
+        from tooluniverse.cli import cmd_status
+
+        out, _ = _run(monkeypatch, cmd_status, _args(), tu, capsys)
+        # _render_status always emits "tools loaded:    N"
+        assert "tools loaded:" in out
+        assert "workspace:" in out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# G. tu build
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestBuild:
+    """Tests for the `tu build` subcommand."""
+
+    @pytest.mark.unit
+    def test_build_prints_both_step_labels(self, capsys):
+        """tu build runs both steps and prints their labels to stdout."""
+        from tooluniverse.cli import cmd_build
+
+        cmd_build(_args())
+        out = capsys.readouterr().out
+        # cmd_build prints "Regenerating lazy registry…" and "Regenerating coding-API wrappers…"
+        assert "Regenerating lazy registry" in out
+        assert "Regenerating coding-API wrappers" in out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# H. Argparse / error handling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestArgparse:
+    """Tests for argparse-level argument handling."""
+
+    @pytest.mark.unit
+    def test_no_subcommand_exits_2(self):
+        """Running tu with no subcommand exits with code 2."""
+        rc, _, err = _cli()
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_unknown_subcommand_exits_2(self):
+        """Unknown subcommand exits with code 2."""
+        rc, _, err = _cli("xyzzy_unknown_command")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_grep_missing_pattern_exits_2(self):
+        """tu grep with no pattern exits with code 2."""
+        rc, _, _ = _cli("grep")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_info_missing_tool_exits_2(self):
+        """tu info with no tool name exits with code 2."""
+        rc, _, _ = _cli("info")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_find_missing_query_exits_2(self):
+        """tu find with no query exits with code 2."""
+        rc, _, _ = _cli("find")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_run_missing_tool_name_exits_2(self):
+        """tu run with no tool name exits with code 2."""
+        rc, _, _ = _cli("run")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_list_invalid_mode_exits_2(self):
+        """tu list --mode invalid_mode exits with code 2."""
+        rc, _, _ = _cli("list", "--mode", "invalid_mode_xyz")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_grep_invalid_field_exits_2(self):
+        """tu grep protein --field invalid exits with code 2."""
+        rc, _, _ = _cli("grep", "protein", "--field", "invalid_field_xyz")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_list_limit_not_integer_exits_2(self):
+        """tu list --limit abc exits with code 2."""
+        rc, _, _ = _cli("list", "--limit", "abc")
+        assert rc == 2
+
+    @pytest.mark.unit
+    def test_run_invalid_json_exits_1(self):
+        """tu run list_tools '{bad json}' exits with code 1."""
+        rc, out, err = _cli("run", "list_tools", "{bad json}")
+        assert rc == 1
+        assert "Error" in err
+
+    @pytest.mark.unit
+    def test_help_exits_0(self):
+        """tu --help exits with code 0."""
+        rc, out, _ = _cli("--help")
+        assert rc == 0
+        assert "COMMAND" in out
+
+    @pytest.mark.unit
+    def test_subcommand_help_exits_0(self):
+        """tu list --help exits with code 0."""
+        rc, out, _ = _cli("list", "--help")
+        assert rc == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# I. Output format correctness
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestOutputFormat:
+    """Tests that verify --json always produces valid JSON and --raw is compact."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "cmd_fn,ns_kw",
+        [
+            ("cmd_list", {"mode": "names", "limit": 3, "json": True}),
+            ("cmd_list", {"mode": "categories", "json": True}),
+            ("cmd_grep", {"pattern": "protein", "limit": 3, "json": True}),
+            ("cmd_info", {"tool_names": ["list_tools"], "json": True}),
+            ("cmd_find", {"query": "drug discovery", "limit": 3, "json": True}),
+            ("cmd_run", {"tool_name": "list_tools", "arguments": ["{}"] }),
+            ("cmd_status", {"json": True}),
+        ],
+    )
+    def test_json_flag_produces_valid_json(self, monkeypatch, tu, capsys, cmd_fn, ns_kw):
+        """--json flag (or cmd_run default) produces valid JSON on stdout."""
+        import tooluniverse.cli as m
+
+        fn = getattr(m, cmd_fn)
+        out, _ = _run(monkeypatch, fn, _args(**ns_kw), tu, capsys)
+        _j(out)  # raises AssertionError if not valid JSON
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "cmd_fn,ns_kw",
+        [
+            ("cmd_list", {"mode": "names", "limit": 2, "raw": True}),
+            ("cmd_grep", {"pattern": "protein", "limit": 2, "raw": True}),
+            ("cmd_status", {"raw": True}),
+        ],
+    )
+    def test_raw_flag_produces_compact_json(
+        self, monkeypatch, tu, capsys, cmd_fn, ns_kw
+    ):
+        """--raw produces compact JSON without indentation."""
+        import tooluniverse.cli as m
+
+        fn = getattr(m, cmd_fn)
+        out, _ = _run(monkeypatch, fn, _args(**ns_kw), tu, capsys)
+        _j(out)
+        assert "\n  " not in out  # no 2-space indentation
+
+    @pytest.mark.unit
+    def test_status_messages_not_on_stdout(self, monkeypatch, tu, capsys):
+        """Loading/warning messages from ToolUniverse do not appear on stdout."""
+        from tooluniverse.cli import cmd_list
+
+        out, _ = _run(monkeypatch, cmd_list, _args(mode="names", limit=2, json=True), tu, capsys)
+        # If output starts with '{', it's clean JSON (no prefix messages)
+        assert out.strip().startswith("{") or out.strip().startswith("[")
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "cmd_fn,ns_kw",
+        [
+            ("cmd_list", {"limit": 3}),            # default → categories (no filter)
+            ("cmd_grep", {"pattern": "protein", "limit": 3}),
+            ("cmd_find", {"query": "drug discovery", "limit": 3}),
+            ("cmd_status", {}),
+        ],
+    )
+    def test_human_readable_default_not_json(self, monkeypatch, tu, capsys, cmd_fn, ns_kw):
+        """Default output (no --json/--raw) is human-readable text, not raw JSON."""
+        import tooluniverse.cli as m
+
+        fn = getattr(m, cmd_fn)
+        out, _ = _run(monkeypatch, fn, _args(**ns_kw), tu, capsys)
+        stripped = out.strip()
+        assert stripped, "Expected non-empty human-readable output"
+        assert not stripped.startswith("{"), f"Expected human text, got JSON: {stripped[:100]}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# J. Subprocess / pipe integration  (slow tests, real end-to-end)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestSubprocessIntegration:
+    """End-to-end subprocess tests verifying real stdout/stderr separation."""
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_list_stdout_is_clean_json(self):
+        """tu list --mode categories --json produces only JSON on stdout."""
+        rc, out, err = _cli("list", "--mode", "categories", "--limit", "5", "--json")
+        assert rc == 0
+        d = _j(out)
+        assert "categories" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_list_default_human_readable(self):
+        """tu list (no flags) produces human-readable categories table."""
+        rc, out, err = _cli("list", "--limit", "5")
+        assert rc == 0
+        assert not out.strip().startswith("{")
+        # _render_list categories mode always has a "─" separator line
+        assert "─" in out or "categories" in out.lower()
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_grep_stdout_is_clean_json(self):
+        """tu grep --json produces only JSON on stdout."""
+        rc, out, err = _cli("grep", "protein", "--limit", "3", "--json")
+        assert rc == 0
+        d = _j(out)
+        assert "total_matches" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_grep_human_readable(self):
+        """tu grep (no --json) produces a human-readable name/description table."""
+        rc, out, err = _cli("grep", "protein", "--limit", "3")
+        assert rc == 0
+        assert not out.strip().startswith("{")
+        # _render_grep always emits a "name  description" header
+        assert "name" in out and "description" in out
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_status_stdout_is_clean_json(self):
+        """tu status --json produces only JSON on stdout."""
+        rc, out, err = _cli("status", "--json")
+        assert rc == 0
+        d = _j(out)
+        assert "tools_loaded" in d
+        assert d["tools_loaded"] >= 100
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_status_human_readable(self):
+        """tu status (no --json) produces human-readable key-value output."""
+        rc, out, err = _cli("status")
+        assert rc == 0
+        # _render_status always emits "tools loaded:    N"
+        assert "tools loaded:" in out
+        assert "workspace:" in out
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_loading_messages_on_stderr(self):
+        """Tool-loading status messages go to stderr, not stdout."""
+        rc, out, err = _cli("list", "--mode", "names", "--limit", "1", "--json")
+        assert rc == 0
+        # stdout should be pure JSON
+        _j(out)
+        # stderr may contain loading messages (or be empty if tools already cached)
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_find_returns_tools(self):
+        """tu find with natural-language query returns tool results."""
+        rc, out, err = _cli("find", "protein structure analysis", "--limit", "3", "--json")
+        assert rc == 0
+        d = _j(out)
+        assert "tools" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_run_list_tools(self):
+        """tu run list_tools with JSON args works end-to-end."""
+        rc, out, err = _cli("run", "list_tools", '{"mode": "categories"}')
+        assert rc == 0
+        d = _j(out)
+        assert "categories" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_run_key_value(self):
+        """tu run list_tools mode=categories via key=value syntax works."""
+        rc, out, err = _cli("run", "list_tools", "mode=categories")
+        assert rc == 0
+        d = _j(out)
+        assert "categories" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_run_no_args(self):
+        """tu run list_tools with no args returns a valid list_tools response."""
+        rc, out, err = _cli("run", "list_tools")
+        assert rc == 0
+        d = _j(out)
+        assert "tools" in d or "categories" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_raw_pipe_to_python(self):
+        """tu list --raw output can be piped and parsed by Python."""
+        rc, out, err = _cli("list", "--mode", "categories", "--raw")
+        assert rc == 0
+        d = _j(out)
+        assert "categories" in d
+        # Verify it's truly compact (no indentation)
+        assert "\n  " not in out
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_info_nonexistent_exits_0(self):
+        """tu info for nonexistent tool exits 0 but returns error JSON."""
+        rc, out, err = _cli("info", "ZZZNOMATCH_TOOL_9999", "--json")
+        assert rc == 0
+        d = _j(out)
+        assert "error" in d
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_run_invalid_json_exits_1(self):
+        """tu run with invalid JSON exits 1 and prints error to stderr."""
+        rc, out, err = _cli("run", "list_tools", "{bad json}")
+        assert rc == 1
+        assert "Error" in err
+        assert out.strip() == ""  # nothing on stdout
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_list_custom_fields(self):
+        """tu list --mode custom --fields name type returns only those fields."""
+        rc, out, err = _cli(
+            "list", "--mode", "custom", "--fields", "name", "type", "--limit", "3", "--json"
+        )
+        assert rc == 0
+        d = _j(out)
+        assert "tools" in d
+        for tool in d["tools"]:
+            assert "name" in tool
+            assert "type" in tool
+            assert "description" not in tool
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_grep_regex_anchored(self):
+        """tu grep '^UniProt' --mode regex returns only UniProt-prefixed tools."""
+        rc, out, err = _cli("grep", "^UniProt", "--mode", "regex", "--limit", "5", "--json")
+        assert rc == 0
+        d = _j(out)
+        for tool in d["tools"]:
+            assert tool["name"].startswith("UniProt")
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_e2e_list_case_insensitive_category(self):
+        """tu list --categories UniProt and uniprot return same count."""
+        rc1, out1, _ = _cli("list", "--categories", "uniprot", "--json")
+        rc2, out2, _ = _cli("list", "--categories", "UniProt", "--json")
+        assert rc1 == 0 and rc2 == 0
+        d1, d2 = _j(out1), _j(out2)
+        assert d1.get("total_tools") == d2.get("total_tools")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# K. Render function smoke tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRenderFunctions:
+    """Smoke tests for _render_* pure functions."""
+
+    @pytest.mark.unit
+    def test_render_list_categories_mode(self):
+        """_render_list with categories data produces two-column table."""
+        from tooluniverse.cli import _render_list
+
+        data = {"categories": {"uniprot": 47, "chembl": 38}}
+        out = _render_list(data)
+        assert "uniprot" in out
+        assert "chembl" in out
+        assert "47" in out
+
+    @pytest.mark.unit
+    def test_render_list_names_mode(self):
+        """_render_list with names data lists tool names."""
+        from tooluniverse.cli import _render_list
+
+        data = {"tools": ["tool_a", "tool_b"], "total_tools": 10, "has_more": True}
+        out = _render_list(data)
+        assert "tool_a" in out
+        assert "tool_b" in out
+
+    @pytest.mark.unit
+    def test_render_grep_normal(self):
+        """_render_grep produces name + description table."""
+        from tooluniverse.cli import _render_grep
+
+        data = {
+            "tools": [{"name": "get_protein", "description": "Retrieve protein data"}],
+            "total_matches": 1,
+            "has_more": False,
+        }
+        out = _render_grep(data)
+        assert "get_protein" in out
+        assert "Retrieve protein" in out
+
+    @pytest.mark.unit
+    def test_render_grep_error(self):
+        """_render_grep with error key shows error message."""
+        from tooluniverse.cli import _render_grep
+
+        out = _render_grep({"error": "bad pattern"})
+        assert "bad pattern" in out
+
+    @pytest.mark.unit
+    def test_render_find_normal(self):
+        """_render_find produces score + name + description table."""
+        from tooluniverse.cli import _render_find
+
+        data = {
+            "tools": [{"name": "get_protein", "description": "Retrieve protein", "score": 0.287}]
+        }
+        out = _render_find(data)
+        assert "get_protein" in out
+        assert "0.287" in out
+
+    @pytest.mark.unit
+    def test_render_find_empty(self):
+        """_render_find with no tools returns '0 results'."""
+        from tooluniverse.cli import _render_find
+
+        out = _render_find({"tools": []})
+        assert "0 results" in out
+
+    @pytest.mark.unit
+    def test_render_info_single(self):
+        """_render_info for a single tool shows name and description."""
+        from tooluniverse.cli import _render_info
+
+        data = {
+            "name": "list_tools",
+            "description": "List available tools",
+            "category": "meta",
+            "parameter": {
+                "type": "object",
+                "properties": {"mode": {"type": "string", "description": "Output mode"}},
+                "required": [],
+            },
+        }
+        out = _render_info(data)
+        assert "list_tools" in out
+        assert "List available tools" in out
+        assert "mode" in out
+
+    @pytest.mark.unit
+    def test_render_status_normal(self):
+        """_render_status produces key-value pairs."""
+        from tooluniverse.cli import _render_status
+
+        data = {
+            "tools_loaded": 1907,
+            "categories": 413,
+            "workspace": "./.tooluniverse",
+            "profile_active": False,
+            "top_categories": {"uniprot": 47, "chembl": 38},
+        }
+        out = _render_status(data)
+        assert "1907" in out
+        assert "413" in out
+        assert ".tooluniverse" in out
+        assert "uniprot" in out
+
+    @pytest.mark.unit
+    def test_print_result_fallback_on_render_error(self, capsys):
+        """_print_result falls back to pretty JSON when render_fn raises."""
+        from tooluniverse.cli import _print_result
+
+        def bad_renderer(d):
+            raise ValueError("render boom")
+
+        _print_result({"key": "value"}, _args(), bad_renderer)
+        out = capsys.readouterr().out
+        # Should output valid JSON, not crash
+        assert '"key"' in out
+        assert '"value"' in out
+
+    @pytest.mark.unit
+    def test_trunc_short_string(self):
+        """_trunc does not modify short strings."""
+        from tooluniverse.cli import _trunc
+
+        assert _trunc("hello") == "hello"
+
+    @pytest.mark.unit
+    def test_trunc_long_string(self):
+        """_trunc truncates long strings with ellipsis."""
+        from tooluniverse.cli import _trunc
+
+        long = "x" * 100
+        result = _trunc(long, 20)
+        assert len(result) == 20
+        assert result.endswith("…")
+
+
+class TestResolveCategories:
+    """Tests for _resolve_categories — case-insensitive category name mapping."""
+
+    @pytest.mark.unit
+    def test_exact_match_returned_as_is(self):
+        """Exact category name is returned unchanged."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": [], "Proteomics": []}
+        assert _resolve_categories(tu, ["Genomics"]) == ["Genomics"]
+
+    @pytest.mark.unit
+    def test_case_insensitive_match(self):
+        """Lowercase input resolves to the stored mixed-case key."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": [], "Proteomics": []}
+        assert _resolve_categories(tu, ["genomics"]) == ["Genomics"]
+
+    @pytest.mark.unit
+    def test_uppercase_input_resolves(self):
+        """Uppercase input resolves to the stored key."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": []}
+        assert _resolve_categories(tu, ["GENOMICS"]) == ["Genomics"]
+
+    @pytest.mark.unit
+    def test_unknown_category_passed_through(self):
+        """Unknown category name is returned as-is (no KeyError)."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": []}
+        assert _resolve_categories(tu, ["NonExistent"]) == ["NonExistent"]
+
+    @pytest.mark.unit
+    def test_multiple_names_mixed(self):
+        """Multiple names resolved independently — mix of hits and misses."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": [], "Proteomics": []}
+        result = _resolve_categories(tu, ["genomics", "PROTEOMICS", "Unknown"])
+        assert result == ["Genomics", "Proteomics", "Unknown"]
+
+    @pytest.mark.unit
+    def test_empty_names_list(self):
+        """Empty input returns empty list."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = {"Genomics": []}
+        assert _resolve_categories(tu, []) == []
+
+    @pytest.mark.unit
+    def test_none_tool_category_dicts(self):
+        """None tool_category_dicts treated as empty — names passed through."""
+        from tooluniverse.cli import _resolve_categories
+        from unittest.mock import MagicMock
+
+        tu = MagicMock()
+        tu.tool_category_dicts = None
+        assert _resolve_categories(tu, ["Genomics"]) == ["Genomics"]
+
+
+class TestServe:
+    """Tests for `tu serve` subcommand."""
+
+    @pytest.mark.unit
+    def test_serve_subcommand_is_registered(self):
+        """'serve' is a recognised subcommand (argparse doesn't exit 2)."""
+        import argparse
+        from tooluniverse.cli import main
+
+        # Patch sys.argv and intercept before cmd_serve runs
+        import sys
+        from unittest.mock import patch, MagicMock
+
+        mock_serve = MagicMock()
+        with patch("tooluniverse.cli.cmd_serve", mock_serve), \
+             patch.object(sys, "argv", ["tu", "serve"]):
+            main()
+
+        mock_serve.assert_called_once()
+
+    @pytest.mark.unit
+    def test_serve_calls_run_default_stdio_server(self):
+        """cmd_serve delegates to run_default_stdio_server."""
+        import argparse
+        from unittest.mock import patch, MagicMock
+
+        mock_server = MagicMock()
+        with patch("tooluniverse.smcp_server.run_default_stdio_server", mock_server):
+            from tooluniverse.cli import cmd_serve
+            cmd_serve(argparse.Namespace())
+
+        mock_server.assert_called_once_with()
+
+    @pytest.mark.unit
+    def test_serve_help_exits_0(self):
+        """'tu serve --help' exits with code 0."""
+        rc, out, _ = _cli("serve", "--help")
+        assert rc == 0
+        assert "serve" in out.lower() or "mcp" in out.lower()
+
+    @pytest.mark.unit
+    def test_serve_no_extra_args_accepted(self):
+        """'tu serve --bogus' is rejected by argparse (exit 2)."""
+        rc, _, _ = _cli("serve", "--bogus")
+        assert rc == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# L. _compact
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCompact:
+    """Direct unit tests for _compact — strips None values from a dict."""
+
+    @pytest.mark.unit
+    def test_empty_dict(self):
+        from tooluniverse.cli import _compact
+        assert _compact({}) == {}
+
+    @pytest.mark.unit
+    def test_no_nones_unchanged(self):
+        from tooluniverse.cli import _compact
+        assert _compact({"a": 1, "b": "x"}) == {"a": 1, "b": "x"}
+
+    @pytest.mark.unit
+    def test_all_nones_returns_empty(self):
+        from tooluniverse.cli import _compact
+        assert _compact({"a": None, "b": None}) == {}
+
+    @pytest.mark.unit
+    def test_mixed_keeps_non_none(self):
+        from tooluniverse.cli import _compact
+        assert _compact({"a": 1, "b": None, "c": False, "d": None}) == {"a": 1, "c": False}
+
+    @pytest.mark.unit
+    def test_falsy_non_none_values_kept(self):
+        """0, False, and '' are falsy but not None — must be kept."""
+        from tooluniverse.cli import _compact
+        assert _compact({"a": 0, "b": "", "c": None}) == {"a": 0, "b": ""}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# M. _status_to_stderr
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestStatusToStderr:
+    """Direct unit tests for _status_to_stderr context manager."""
+
+    @pytest.mark.unit
+    def test_print_inside_goes_to_stderr(self, capsys):
+        from tooluniverse.cli import _status_to_stderr
+        with _status_to_stderr():
+            print("routed to stderr")
+        cap = capsys.readouterr()
+        assert "routed to stderr" in cap.err
+        assert cap.out == ""
+
+    @pytest.mark.unit
+    def test_stdout_restored_after_context(self, capsys):
+        from tooluniverse.cli import _status_to_stderr
+        with _status_to_stderr():
+            pass
+        print("back on stdout")
+        cap = capsys.readouterr()
+        assert "back on stdout" in cap.out
+
+    @pytest.mark.unit
+    def test_stdout_restored_after_exception(self, capsys):
+        from tooluniverse.cli import _status_to_stderr
+        try:
+            with _status_to_stderr():
+                raise ValueError("boom")
+        except ValueError:
+            pass
+        print("restored after exception")
+        cap = capsys.readouterr()
+        assert "restored after exception" in cap.out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# N. _infer_type — float path
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestInferTypeFloat:
+    """_infer_type float coercion path — not covered by existing TestRun tests."""
+
+    @pytest.mark.unit
+    def test_float_decimal(self):
+        from tooluniverse.cli import _infer_type
+        result = _infer_type("3.14")
+        assert result == 3.14
+        assert isinstance(result, float)
+
+    @pytest.mark.unit
+    def test_float_scientific_notation(self):
+        from tooluniverse.cli import _infer_type
+        assert _infer_type("1e5") == 100000.0
+
+    @pytest.mark.unit
+    def test_float_negative(self):
+        from tooluniverse.cli import _infer_type
+        assert _infer_type("-2.5") == -2.5
+
+    @pytest.mark.unit
+    def test_float_not_returned_for_int_string(self):
+        """Integers must stay int, not become float."""
+        from tooluniverse.cli import _infer_type
+        result = _infer_type("42")
+        assert result == 42
+        assert isinstance(result, int)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# O. _render_list edge cases
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRenderListEdgeCases:
+    """_render_list paths not covered by existing TestRenderFunctions."""
+
+    @pytest.mark.unit
+    def test_empty_tools_list_shows_total(self):
+        from tooluniverse.cli import _render_list
+        result = _render_list({"tools": [], "total_tools": 7})
+        assert "no tools" in result
+        assert "7" in result
+
+    @pytest.mark.unit
+    def test_categories_mode_empty_dict(self):
+        from tooluniverse.cli import _render_list
+        result = _render_list({"categories": {}})
+        assert "no categories" in result
+
+    @pytest.mark.unit
+    def test_names_mode_has_more_hint(self):
+        from tooluniverse.cli import _render_list
+        d = {"tools": ["ToolA", "ToolB"], "total_tools": 100, "has_more": True}
+        result = _render_list(d)
+        assert "--offset" in result
+
+    @pytest.mark.unit
+    def test_names_mode_no_hint_when_no_more(self):
+        from tooluniverse.cli import _render_list
+        d = {"tools": ["ToolA"], "total_tools": 1, "has_more": False}
+        result = _render_list(d)
+        assert "--offset" not in result
+
+    @pytest.mark.unit
+    def test_basic_mode_tools_without_description_no_crash(self):
+        """Tool dicts without 'description' fall through to str() rendering."""
+        from tooluniverse.cli import _render_list
+        d = {"tools": [{"name": "ToolA", "type": "api"}, {"name": "ToolB", "type": "api"}], "total_tools": 2}
+        result = _render_list(d)
+        assert "ToolA" in result or "ToolB" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# P. _render_info — parameter block & batch mode
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRenderInfoParameters:
+    """_render_info parameter section and batch rendering."""
+
+    @pytest.mark.unit
+    def test_required_param_labeled(self):
+        from tooluniverse.cli import _render_info
+        d = {
+            "name": "MyTool",
+            "description": "does stuff",
+            "parameter": {
+                "properties": {"query": {"type": "string", "description": "search term"}},
+                "required": ["query"],
+            },
+        }
+        result = _render_info(d)
+        assert "query" in result
+        assert "required" in result
+        assert "string" in result
+
+    @pytest.mark.unit
+    def test_optional_param_not_labeled_required(self):
+        from tooluniverse.cli import _render_info
+        d = {
+            "name": "MyTool",
+            "description": "does stuff",
+            "parameter": {
+                "properties": {"limit": {"type": "integer", "description": "max results"}},
+                "required": [],
+            },
+        }
+        result = _render_info(d)
+        assert "limit" in result
+        assert "required" not in result
+
+    @pytest.mark.unit
+    def test_no_params_no_parameters_header(self):
+        from tooluniverse.cli import _render_info
+        d = {"name": "MyTool", "description": "simple", "parameter": {}}
+        result = _render_info(d)
+        assert "Parameters:" not in result
+
+    @pytest.mark.unit
+    def test_category_shown_in_brackets(self):
+        from tooluniverse.cli import _render_info
+        d = {"name": "MyTool", "description": "desc", "category": "Genomics"}
+        result = _render_info(d)
+        assert "[Genomics]" in result
+
+    @pytest.mark.unit
+    def test_batch_mode_renders_all_tools(self):
+        from tooluniverse.cli import _render_info
+        d = {
+            "tools": [
+                {"name": "ToolA", "description": "first"},
+                {"name": "ToolB", "description": "second"},
+            ]
+        }
+        result = _render_info(d)
+        assert "ToolA" in result
+        assert "ToolB" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Q. _render_find — score formatting
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRenderFindScore:
+    """_render_find score formatting branches."""
+
+    @pytest.mark.unit
+    def test_float_score_formatted_3dp(self):
+        from tooluniverse.cli import _render_find
+        d = {"tools": [{"name": "ToolA", "description": "desc", "score": 0.9876}]}
+        result = _render_find(d)
+        assert "0.988" in result
+
+    @pytest.mark.unit
+    def test_int_score_shown_as_string(self):
+        from tooluniverse.cli import _render_find
+        d = {"tools": [{"name": "ToolA", "description": "desc", "score": 42}]}
+        result = _render_find(d)
+        assert "42" in result
+
+    @pytest.mark.unit
+    def test_relevance_score_key_used_as_fallback(self):
+        from tooluniverse.cli import _render_find
+        d = {"tools": [{"name": "ToolA", "description": "desc", "relevance_score": 0.5}]}
+        result = _render_find(d)
+        assert "0.500" in result
+
+    @pytest.mark.unit
+    def test_string_score_shown_verbatim(self):
+        from tooluniverse.cli import _render_find
+        d = {"tools": [{"name": "ToolA", "description": "desc", "score": "high"}]}
+        result = _render_find(d)
+        assert "high" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R. cmd_test
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCmdTest:
+    """Tests for `tu test` subcommand (cmd_test)."""
+
+    def _ns(self, **kw):
+        defaults = dict(tool_name=None, args_json=None, config=None)
+        defaults.update(kw)
+        return argparse.Namespace(**defaults)
+
+    _DEFAULT_RV = {"status": "success", "data": {"r": 1}}
+
+    def _make_tu(self, tool_def, return_value=_DEFAULT_RV):
+        from unittest.mock import MagicMock
+        tu = MagicMock()
+        tu.all_tool_dict = {tool_def["name"]: tool_def}
+        tu.run_one_function = MagicMock(return_value=return_value)
+        return tu
+
+    def _cfg_file(self, cfg: dict) -> str:
+        """Write cfg to a temp JSON file, return path."""
+        import json as _j
+        import tempfile
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        _j.dump(cfg, f)
+        f.close()
+        return f.name
+
+    # ── tool-not-found ────────────────────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_tool_not_found_exits_1(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        from unittest.mock import MagicMock
+        tu = MagicMock()
+        tu.all_tool_dict = {}
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="NoSuchTool_xyz"))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_tool_not_found_prints_message(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        from unittest.mock import MagicMock
+        tu = MagicMock()
+        tu.all_tool_dict = {}
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit):
+            m.cmd_test(self._ns(tool_name="NoSuchTool_xyz"))
+        assert "not found" in capsys.readouterr().out
+
+    # ── test_examples auto-discovery ─────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_no_examples_no_args_exits_1(self, monkeypatch, capsys):
+        """Tool with no test_examples and no args given → exit 1."""
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="FakeTool"))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_test_examples_auto_discovered_and_pass(self, monkeypatch, capsys):
+        """test_examples from tool def are used when no args given."""
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x", "test_examples": [{"q": "hi"}]}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        m.cmd_test(self._ns(tool_name="FakeTool"))
+        assert "passed" in capsys.readouterr().out.lower()
+
+    @pytest.mark.unit
+    def test_multiple_examples_all_pass(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x",
+                    "test_examples": [{"q": "a"}, {"q": "b"}, {"q": "c"}]}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        m.cmd_test(self._ns(tool_name="FakeTool"))
+        out = capsys.readouterr().out
+        assert "3" in out  # 3 test(s) passed
+
+    # ── ad-hoc args_json ──────────────────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_adhoc_args_json_happy_path(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        m.cmd_test(self._ns(tool_name="FakeTool", args_json='{"q": "test"}'))
+        out = capsys.readouterr().out
+        assert "passed" in out.lower()
+
+    @pytest.mark.unit
+    def test_adhoc_args_json_invalid_exits_1(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        from unittest.mock import MagicMock
+        monkeypatch.setattr(m, "_get_tu", MagicMock())
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="FakeTool", args_json="{not: valid}"))
+        assert exc.value.code == 1
+
+    # ── result validation ─────────────────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_none_result_counted_as_failure(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x", "test_examples": [{"q": "hi"}]}
+        tu = self._make_tu(tool_def, return_value=None)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="FakeTool"))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_empty_dict_result_counted_as_failure(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x", "test_examples": [{"q": "hi"}]}
+        tu = self._make_tu(tool_def, return_value={})
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="FakeTool"))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_exception_in_run_counted_as_failure(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        from unittest.mock import MagicMock
+        tool_def = {"name": "FakeTool", "description": "x", "test_examples": [{"q": "hi"}]}
+        tu = MagicMock()
+        tu.all_tool_dict = {"FakeTool": tool_def}
+        tu.run_one_function = MagicMock(side_effect=RuntimeError("connection failed"))
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(tool_name="FakeTool"))
+        assert exc.value.code == 1
+
+    # ── config file ───────────────────────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_config_file_happy_path(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        cfg = {"tool_name": "FakeTool", "tests": [
+            {"name": "basic", "args": {"q": "test"}, "expect_status": "success", "expect_keys": ["status"]}
+        ]}
+        m.cmd_test(self._ns(config=self._cfg_file(cfg)))
+        assert "passed" in capsys.readouterr().out.lower()
+
+    @pytest.mark.unit
+    def test_config_expect_status_mismatch_exits_1(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def, return_value={"status": "error", "data": {}})
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        cfg = {"tool_name": "FakeTool", "tests": [
+            {"name": "t1", "args": {}, "expect_status": "success", "expect_keys": []}
+        ]}
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(config=self._cfg_file(cfg)))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_config_expect_keys_missing_exits_1(self, monkeypatch, capsys):
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def, return_value={"status": "success"})
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        cfg = {"tool_name": "FakeTool", "tests": [
+            {"name": "t1", "args": {}, "expect_status": None, "expect_keys": ["missing_key"]}
+        ]}
+        with pytest.raises(SystemExit) as exc:
+            m.cmd_test(self._ns(config=self._cfg_file(cfg)))
+        assert exc.value.code == 1
+
+    @pytest.mark.unit
+    def test_config_empty_tests_list_exits_0(self, monkeypatch, capsys):
+        """Config file with empty tests list: 0 passed, 0 failed → exit 0."""
+        import tooluniverse.cli as m
+        tool_def = {"name": "FakeTool", "description": "x"}
+        tu = self._make_tu(tool_def)
+        monkeypatch.setattr(m, "_get_tu", lambda: tu)
+        cfg = {"tool_name": "FakeTool", "tests": []}
+        m.cmd_test(self._ns(config=self._cfg_file(cfg)))  # should not raise
+        assert "passed" in capsys.readouterr().out.lower()
+
+    # ── argparse registration ─────────────────────────────────────────────────
+
+    @pytest.mark.unit
+    def test_subcommand_help_exits_0(self):
+        rc, out, _ = _cli("test", "--help")
+        assert rc == 0
+        assert "test" in out.lower()

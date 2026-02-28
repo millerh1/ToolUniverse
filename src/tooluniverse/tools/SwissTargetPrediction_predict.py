@@ -11,7 +11,7 @@ from ._shared_client import get_shared_client
 def SwissTargetPrediction_predict(
     operation: str,
     smiles: str,
-    organism: Optional[str | Any] = "Homo_sapiens",
+    organism: Optional[str | Any] = 'Homo_sapiens',
     top_n: Optional[int | Any] = None,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
@@ -44,19 +44,21 @@ def SwissTargetPrediction_predict(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "operation": operation,
+                "smiles": smiles,
+                "organism": organism,
+                "top_n": top_n
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
         {
             "name": "SwissTargetPrediction_predict",
-            "arguments": {
-                "operation": operation,
-                "smiles": smiles,
-                "organism": organism,
-                "top_n": top_n,
-            },
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

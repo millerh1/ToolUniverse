@@ -53,22 +53,24 @@ def NCA_compute_parameters(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "NCA_compute_parameters",
-            "arguments": {
-                "times": times,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "times": times,
                 "concentrations": concentrations,
                 "dose": dose,
                 "route": route,
                 "dose_unit": dose_unit,
                 "conc_unit": conc_unit,
-                "time_unit": time_unit,
-            },
+                "time_unit": time_unit
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "NCA_compute_parameters",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

@@ -41,10 +41,16 @@ def GtoPdb_search_ligands(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v
+        for k, v in {"name": name, "type": type_, "approved": approved}.items()
+        if v is not None
+    }
     return get_shared_client().run_one_function(
         {
             "name": "GtoPdb_search_ligands",
-            "arguments": {"name": name, "type": type_, "approved": approved},
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

@@ -135,7 +135,7 @@ print(f"✅ All steps complete!")
 **Required Files**:
 - `src/tooluniverse/my_api_tool.py` - Implementation
 - `src/tooluniverse/data/my_api_tools.json` - Tool definitions
-- `tests/unit/test_my_api_tool.py` - Tests
+- `tests/tools/test_my_api_tool.py` - Tests
 - `examples/my_api_examples.py` - Usage examples
 
 **Auto-Generated** (don't create manually):
@@ -904,7 +904,7 @@ PYTHONPATH=src python3 -m tooluniverse.generate_tools --force
 ls src/tooluniverse/tools/YourCategory_*.py
 
 # Run unit tests
-pytest tests/unit/test_your_tool.py -v
+pytest tests/tools/test_your_tool.py -v
 
 # MANDATORY: Run test_new_tools.py validation
 python scripts/test_new_tools.py your_tool -v

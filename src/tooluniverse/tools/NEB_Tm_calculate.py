@@ -47,20 +47,22 @@ def NEB_Tm_calculate(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "NEB_Tm_calculate",
-            "arguments": {
-                "primer_sequence": primer_sequence,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "primer_sequence": primer_sequence,
                 "primer_sequence_2": primer_sequence_2,
                 "polymerase": polymerase,
                 "primer_concentration": primer_concentration,
-                "monovalent_salt_mm": monovalent_salt_mm,
-            },
+                "monovalent_salt_mm": monovalent_salt_mm
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "NEB_Tm_calculate",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

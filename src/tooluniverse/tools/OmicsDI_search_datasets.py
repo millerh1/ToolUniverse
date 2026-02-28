@@ -56,23 +56,25 @@ def OmicsDI_search_datasets(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "OmicsDI_search_datasets",
-            "arguments": {
-                "query": query,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "query": query,
                 "start": start,
                 "size": size,
                 "omics_type": omics_type,
                 "organism": organism,
                 "tissue": tissue,
                 "sortfield": sortfield,
-                "order": order,
-            },
+                "order": order
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "OmicsDI_search_datasets",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

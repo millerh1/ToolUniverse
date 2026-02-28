@@ -38,10 +38,14 @@ def NCBI_fetch_accessions(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v for k, v in {"operation": operation, "uids": uids}.items() if v is not None
+    }
     return get_shared_client().run_one_function(
         {
             "name": "NCBI_fetch_accessions",
-            "arguments": {"operation": operation, "uids": uids},
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

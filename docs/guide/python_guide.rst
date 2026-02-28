@@ -158,7 +158,7 @@ All tools follow a **consistent structure**:
       .. code-block:: python
 
          # Method 2: Direct Import
-         from tooluniverse.opentarget_tool import OpenTargets_get_associated_targets_by_disease_efoId
+         from tooluniverse.tools import OpenTargets_get_associated_targets_by_disease_efoId
          
          # Call directly
          result = OpenTargets_get_associated_targets_by_disease_efoId(
@@ -519,6 +519,7 @@ Advanced Features
    tool_caller
    tool_composition
    toolspace
+   tu_cli
    examples
    tooluniverse_case_study
    http_api

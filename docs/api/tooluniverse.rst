@@ -17,7 +17,7 @@ Subpackages
    tooluniverse.compose_scripts
    tooluniverse.data
    tooluniverse.database_setup
-   tooluniverse.space
+   tooluniverse.profile
    tooluniverse.tools
 
 Submodules

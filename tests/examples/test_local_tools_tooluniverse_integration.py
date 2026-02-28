@@ -107,18 +107,17 @@ def test_tooluniverse_initialization():
         # Initialize ToolUniverse
         tu = ToolUniverse()
         print("✅ ToolUniverse initialized successfully")
-        
+
         # Check if tools are loaded
         print(f"📊 Loaded tools: {len(tu.tools) if hasattr(tu, 'tools') else 'N/A'}")
-        
+
         return True
-    finally:
-        if 'tu' in locals():
-            tu.close()
-        
     except Exception as e:
         print(f"❌ ToolUniverse initialization failed: {e}")
         return False
+    finally:
+        if 'tu' in locals():
+            tu.close()
 
 def test_tool_registration():
     """Test that our tools are registered."""

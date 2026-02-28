@@ -13,7 +13,7 @@ def VDJDB_search_cdr3(
     cdr3: str,
     species: Optional[str | Any] = None,
     gene: Optional[str | Any] = None,
-    match_type: Optional[str] = "exact",
+    match_type: Optional[str] = 'exact',
     substitutions: Optional[int | Any] = None,
     insertions: Optional[int | Any] = None,
     deletions: Optional[int | Any] = None,
@@ -62,11 +62,9 @@ def VDJDB_search_cdr3(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "VDJDB_search_cdr3",
-            "arguments": {
-                "operation": operation,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "operation": operation,
                 "cdr3": cdr3,
                 "species": species,
                 "gene": gene,
@@ -75,12 +73,16 @@ def VDJDB_search_cdr3(
                 "insertions": insertions,
                 "deletions": deletions,
                 "page": page,
-                "page_size": page_size,
-            },
+                "page_size": page_size
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "VDJDB_search_cdr3",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

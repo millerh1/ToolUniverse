@@ -10,7 +10,7 @@ from ._shared_client import get_shared_client
 
 def LitVar_get_variant_publications(
     rsid: str,
-    format: Optional[str] = "json",
+    format: Optional[str] = 'json',
     max: Optional[int] = 50,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
@@ -41,14 +41,20 @@ def LitVar_get_variant_publications(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "rsid": rsid,
+                "format": format,
+                "max": max
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
         {
             "name": "LitVar_get_variant_publications",
-            "arguments": {"rsid": rsid, "format": format, "max": max},
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

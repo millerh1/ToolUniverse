@@ -9,7 +9,7 @@ from ._shared_client import get_shared_client
 
 
 def EVA_list_studies(
-    species: Optional[str] = "hsapiens_grch38",
+    species: Optional[str] = 'hsapiens_grch38',
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
     use_cache: bool = False,
@@ -35,11 +35,18 @@ def EVA_list_studies(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "species": species
+    }.items() if v is not None}
     return get_shared_client().run_one_function(
-        {"name": "EVA_list_studies", "arguments": {"species": species}},
+        {
+            "name": "EVA_list_studies",
+            "arguments": _args,
+        },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

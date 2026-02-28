@@ -9,10 +9,10 @@ from ._shared_client import get_shared_client
 
 
 def ENCODE_search_annotations(
-    annotation_type: Optional[str] = "candidate Cis-Regulatory Elements",
+    annotation_type: Optional[str] = 'candidate Cis-Regulatory Elements',
     biosample_term_name: Optional[str | Any] = None,
-    organism: Optional[str] = "Homo sapiens",
-    assembly: Optional[str] = "GRCh38",
+    organism: Optional[str] = 'Homo sapiens',
+    assembly: Optional[str] = 'GRCh38',
     limit: Optional[int] = 25,
     *,
     stream_callback: Optional[Callable[[str], None]] = None,
@@ -47,20 +47,22 @@ def ENCODE_search_annotations(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "ENCODE_search_annotations",
-            "arguments": {
-                "annotation_type": annotation_type,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "annotation_type": annotation_type,
                 "biosample_term_name": biosample_term_name,
                 "organism": organism,
                 "assembly": assembly,
-                "limit": limit,
-            },
+                "limit": limit
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "ENCODE_search_annotations",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

@@ -1,8 +1,8 @@
 """
-Test AgenticTool environment variable integration with Space LLM configuration.
+Test AgenticTool environment variable integration with Profile LLM configuration.
 
 This test module verifies that:
-1. Space LLM configuration correctly passes to AgenticTool via environment variables
+1. Profile LLM configuration correctly passes to AgenticTool via environment variables
 2. Original environment variables still work as expected
 3. Configuration priority is correct for both "default" and "fallback" modes
 """
@@ -21,7 +21,7 @@ class TestAgenticToolEnvironmentVariables:
 
     def setup_method(self):
         """Set up test environment by clearing relevant environment variables."""
-        # Clear Space environment variables
+        # Clear Profile environment variables
         env_vars_to_clear = [
             "TOOLUNIVERSE_LLM_DEFAULT_PROVIDER",
             "TOOLUNIVERSE_LLM_MODEL_DEFAULT",
@@ -40,7 +40,7 @@ class TestAgenticToolEnvironmentVariables:
         """Clean up test environment."""
         self.setup_method()
 
-    def test_toolspace_llm_default_provider_env_var(self):
+    def test_profile_llm_default_provider_env_var(self):
         """Test that TOOLUNIVERSE_LLM_DEFAULT_PROVIDER is correctly read."""
         # Set environment variable
         os.environ["TOOLUNIVERSE_LLM_DEFAULT_PROVIDER"] = "CHATGPT"
@@ -63,7 +63,7 @@ class TestAgenticToolEnvironmentVariables:
             # Verify the provider was correctly read
             assert tool._api_type == "CHATGPT"
 
-    def test_toolspace_llm_model_default_env_var(self):
+    def test_profile_llm_model_default_env_var(self):
         """Test that TOOLUNIVERSE_LLM_MODEL_DEFAULT is correctly read."""
         # Set environment variable
         os.environ["TOOLUNIVERSE_LLM_MODEL_DEFAULT"] = "gpt-4o"
@@ -85,7 +85,7 @@ class TestAgenticToolEnvironmentVariables:
             # Verify the model was correctly read
             assert tool._env_model_id == "gpt-4o"
 
-    def test_toolspace_llm_temperature_env_var(self):
+    def test_profile_llm_temperature_env_var(self):
         """Test that TOOLUNIVERSE_LLM_TEMPERATURE is correctly read."""
         # Set environment variable
         os.environ["TOOLUNIVERSE_LLM_TEMPERATURE"] = "0.8"
@@ -127,7 +127,7 @@ class TestAgenticToolEnvironmentVariables:
             # (it's handled by the LLM client automatically)
             assert not hasattr(tool, '_max_new_tokens')
 
-    def test_toolspace_llm_config_mode_default(self):
+    def test_profile_llm_config_mode_default(self):
         """Test 'default' mode configuration priority."""
         # Set environment variables
         os.environ["TOOLUNIVERSE_LLM_CONFIG_MODE"] = "default"
@@ -155,7 +155,7 @@ class TestAgenticToolEnvironmentVariables:
             assert tool._api_type == "CHATGPT"  # From tool config
             assert tool._temperature == 0.5     # From tool config
 
-    def test_toolspace_llm_config_mode_fallback(self):
+    def test_profile_llm_config_mode_fallback(self):
         """Test 'fallback' mode configuration priority."""
         # Set environment variables
         os.environ["TOOLUNIVERSE_LLM_CONFIG_MODE"] = "fallback"
@@ -183,7 +183,7 @@ class TestAgenticToolEnvironmentVariables:
             assert tool._api_type == "CHATGPT"  # From tool config
             assert tool._temperature == 0.5     # From tool config
 
-    def test_toolspace_llm_config_mode_env_override(self):
+    def test_profile_llm_config_mode_env_override(self):
         """Test 'env_override' mode where environment variables have highest priority."""
         # Set environment variables
         os.environ["TOOLUNIVERSE_LLM_CONFIG_MODE"] = "env_override"

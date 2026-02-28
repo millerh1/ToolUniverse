@@ -53,18 +53,24 @@ def ChEMBL_search_molecules(
     """
     # Handle mutable defaults to avoid B006 linting error
 
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v
+        for k, v in {
+            "molecule_chembl_id": molecule_chembl_id,
+            "pref_name__contains": pref_name__contains,
+            "molecule_type": molecule_type,
+            "fields": fields,
+            "limit": limit,
+            "offset": offset,
+            "format": format,
+        }.items()
+        if v is not None
+    }
     return get_shared_client().run_one_function(
         {
             "name": "ChEMBL_search_molecules",
-            "arguments": {
-                "molecule_chembl_id": molecule_chembl_id,
-                "pref_name__contains": pref_name__contains,
-                "molecule_type": molecule_type,
-                "fields": fields,
-                "limit": limit,
-                "offset": offset,
-                "format": format,
-            },
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

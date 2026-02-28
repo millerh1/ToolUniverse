@@ -91,8 +91,8 @@ class TestQueryByName:
     def test_query_by_name_missing_object_name(self):
         """Test query_by_name without object_name parameter."""
         result = self.tool._query_by_name({})
-        assert "error" in result
-        assert "object_name" in result["error"]
+        assert result.get("status") == "error"
+        assert "object_name" in result["data"]["error"]
 
     @patch.object(SIMBADTool, '_execute_query')
     def test_query_by_name_success(self, mock_execute):
@@ -141,14 +141,14 @@ class TestQueryByCoordinates:
     def test_query_by_coordinates_missing_ra(self):
         """Test query_by_coordinates without ra parameter."""
         result = self.tool._query_by_coordinates({"dec": 41.27})
-        assert "error" in result
-        assert "ra" in result["error"]
+        assert result.get("status") == "error"
+        assert "ra" in result["data"]["error"]
 
     def test_query_by_coordinates_missing_dec(self):
         """Test query_by_coordinates without dec parameter."""
         result = self.tool._query_by_coordinates({"ra": 10.68})
-        assert "error" in result
-        assert "dec" in result["error"]
+        assert result.get("status") == "error"
+        assert "dec" in result["data"]["error"]
 
     @patch.object(SIMBADTool, '_execute_query')
     def test_query_by_coordinates_success(self, mock_execute):
@@ -194,8 +194,8 @@ class TestQueryByIdentifier:
     def test_query_by_identifier_missing_identifier(self):
         """Test query_by_identifier without identifier parameter."""
         result = self.tool._query_by_identifier({})
-        assert "error" in result
-        assert "identifier" in result["error"]
+        assert result.get("status") == "error"
+        assert "identifier" in result["data"]["error"]
 
     @patch.object(SIMBADTool, '_execute_query')
     def test_query_by_identifier_success(self, mock_execute):
@@ -271,26 +271,27 @@ class TestExecuteQuery:
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "M31")
-        assert result["success"] is True
-        assert "results" in result
-        assert len(result["results"]) > 0
-        assert result["results"][0]["main_id"] == "M  31"
+        assert result["status"] == "success"
+        data = result["data"]
+        assert "results" in data
+        assert len(data["results"]) > 0
+        assert data["results"][0]["main_id"] == "M  31"
 
     @patch('requests.post')
     def test_execute_query_timeout(self, mock_post):
         """Test query execution with timeout."""
         mock_post.side_effect = requests.Timeout()
         result = self.tool._execute_query("test script", "M31")
-        assert "error" in result
-        assert "timed out" in result["error"]
+        assert result.get("status") == "error"
+        assert "timed out" in result["data"]["error"]
 
     @patch('requests.post')
     def test_execute_query_network_error(self, mock_post):
         """Test query execution with network error."""
         mock_post.side_effect = requests.RequestException("Connection failed")
         result = self.tool._execute_query("test script", "M31")
-        assert "error" in result
-        assert "Network error" in result["error"]
+        assert result.get("status") == "error"
+        assert "Network error" in result["data"]["error"]
 
     @patch('requests.post')
     def test_execute_query_not_found(self, mock_post):
@@ -301,8 +302,8 @@ class TestExecuteQuery:
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "InvalidObject")
-        assert "error" in result
-        assert "not found" in result["error"]
+        assert result.get("status") == "error"
+        assert "not found" in result["data"]["error"]
 
     @patch('requests.post')
     def test_execute_query_empty_result(self, mock_post):
@@ -313,8 +314,8 @@ class TestExecuteQuery:
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "Empty")
-        assert "error" in result
-        assert "No results" in result["error"]
+        assert result.get("status") == "error"
+        assert "No results" in result["data"]["error"]
 
     @patch('requests.post')
     def test_execute_query_with_metadata_lines(self, mock_post):
@@ -328,10 +329,10 @@ NGC 224 | 00 42 44.330 +41 16 07.50 | Galaxy"""
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "M31")
-        assert result["success"] is True
-        assert len(result["results"]) == 2
+        assert result["status"] == "success"
+        assert len(result["data"]["results"]) == 2
         # Verify metadata lines are filtered out
-        for res in result["results"]:
+        for res in result["data"]["results"]:
             assert "::" not in res["main_id"]
 
     @patch('requests.post')
@@ -346,8 +347,8 @@ NGC 224 | 00 42 44.330 +41 16 07.50 | Galaxy"""
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "query", max_results=5)
-        assert result["success"] is True
-        assert len(result["results"]) == 5
+        assert result["status"] == "success"
+        assert len(result["data"]["results"]) == 5
 
     @patch('requests.post')
     def test_execute_query_parses_multiple_fields(self, mock_post):
@@ -358,11 +359,12 @@ NGC 224 | 00 42 44.330 +41 16 07.50 | Galaxy"""
         mock_post.return_value = mock_response
 
         result = self.tool._execute_query("test script", "Sirius")
-        assert result["success"] is True
-        assert result["results"][0]["main_id"] == "Sirius"
-        assert result["results"][0]["object_type"] == "Star"
-        assert "spectral_type" in result["results"][0]
-        assert "flux" in result["results"][0]
+        assert result["status"] == "success"
+        row = result["data"]["results"][0]
+        assert row["main_id"] == "Sirius"
+        assert row["object_type"] == "Star"
+        assert "spectral_type" in row
+        assert "flux" in row
 
 
 @pytest.mark.unit
@@ -397,8 +399,8 @@ class TestSIMBADAdvancedToolRun:
     def test_run_missing_adql_query(self):
         """Test run() without adql_query parameter."""
         result = self.tool.run({})
-        assert "error" in result
-        assert "adql_query" in result["error"]
+        assert result.get("status") == "error"
+        assert "adql_query" in result["data"]["error"]
 
     @patch('requests.post')
     def test_run_success_json(self, mock_post):
@@ -416,8 +418,8 @@ class TestSIMBADAdvancedToolRun:
             "adql_query": "SELECT TOP 1 main_id, ra, dec, otype FROM basic",
             "format": "json"
         })
-        assert result["success"] is True
-        assert "results" in result
+        assert result["status"] == "success"
+        assert "results" in result["data"]
         mock_post.assert_called_once()
 
     @patch('requests.post')
@@ -432,8 +434,8 @@ class TestSIMBADAdvancedToolRun:
             "adql_query": "SELECT TOP 1 main_id FROM basic",
             "format": "votable"
         })
-        assert result["success"] is True
-        assert "<?xml" in result["results"]
+        assert result["status"] == "success"
+        assert "<?xml" in result["data"]["results"]
 
     @patch('requests.post')
     def test_run_default_format(self, mock_post):
@@ -446,7 +448,7 @@ class TestSIMBADAdvancedToolRun:
         result = self.tool.run({
             "adql_query": "SELECT TOP 1 main_id FROM basic"
         })
-        assert result["success"] is True
+        assert result["status"] == "success"
 
     @patch('requests.post')
     def test_run_with_max_results(self, mock_post):
@@ -460,7 +462,7 @@ class TestSIMBADAdvancedToolRun:
             "adql_query": "SELECT main_id FROM basic",
             "max_results": 50
         })
-        
+
         call_args = mock_post.call_args
         assert call_args[1]["data"]["MAXREC"] == 50
 
@@ -471,8 +473,8 @@ class TestSIMBADAdvancedToolRun:
         result = self.tool.run({
             "adql_query": "SELECT * FROM basic"
         })
-        assert "error" in result
-        assert "timed out" in result["error"]
+        assert result.get("status") == "error"
+        assert "timed out" in result["data"]["error"]
 
     @patch('requests.post')
     def test_run_network_error(self, mock_post):
@@ -481,8 +483,8 @@ class TestSIMBADAdvancedToolRun:
         result = self.tool.run({
             "adql_query": "SELECT * FROM basic"
         })
-        assert "error" in result
-        assert "Network error" in result["error"]
+        assert result.get("status") == "error"
+        assert "Network error" in result["data"]["error"]
 
     @patch('requests.post')
     def test_run_json_parse_error(self, mock_post):
@@ -497,8 +499,8 @@ class TestSIMBADAdvancedToolRun:
             "adql_query": "SELECT * FROM basic",
             "format": "json"
         })
-        assert result["success"] is True
-        assert result["results"] == "Invalid JSON response"
+        assert result["status"] == "success"
+        assert result["data"]["results"] == "Invalid JSON response"
 
 
 @pytest.mark.unit
@@ -523,11 +525,12 @@ class TestIntegration:
             "object_name": "M31",
             "output_format": "basic"
         })
-        
-        assert result["success"] is True
-        assert result["count"] == 1
-        assert result["results"][0]["main_id"] == "M  31"
-        assert "Galaxy" in result["results"][0]["object_type"]
+
+        assert result["status"] == "success"
+        data = result["data"]
+        assert data["count"] == 1
+        assert data["results"][0]["main_id"] == "M  31"
+        assert "Galaxy" in data["results"][0]["object_type"]
 
     @patch('requests.post')
     def test_full_workflow_coordinate_search(self, mock_post):
@@ -545,7 +548,8 @@ NGC 224 | 00 42 44.330 +41 16 07.50 | Galaxy"""
             "radius": 5.0,
             "max_results": 10
         })
-        
-        assert result["success"] is True
-        assert result["count"] >= 1
-        assert len(result["results"]) <= 10
+
+        assert result["status"] == "success"
+        data = result["data"]
+        assert data["count"] >= 1
+        assert len(data["results"]) <= 10

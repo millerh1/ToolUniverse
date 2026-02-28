@@ -173,3 +173,4 @@ DEVTU_*.md
 
 # Claude Code configuration
 .claude/
+.tooluniverse/

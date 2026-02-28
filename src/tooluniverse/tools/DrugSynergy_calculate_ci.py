@@ -59,11 +59,9 @@ def DrugSynergy_calculate_ci(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "DrugSynergy_calculate_ci",
-            "arguments": {
-                "operation": operation,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "operation": operation,
                 "doses_a_single": doses_a_single,
                 "effects_a_single": effects_a_single,
                 "doses_b_single": doses_b_single,
@@ -71,12 +69,16 @@ def DrugSynergy_calculate_ci(
                 "dose_a_combo": dose_a_combo,
                 "dose_b_combo": dose_b_combo,
                 "effect_combo": effect_combo,
-                "assumption": assumption,
-            },
+                "assumption": assumption
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "DrugSynergy_calculate_ci",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

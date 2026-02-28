@@ -29,10 +29,10 @@ python scripts/test_new_tools.py <tool-pattern> -v
 python -m tooluniverse.generate_tools
 ```
 
-5. **Check and update unit tests** if they exist in `tests/unit/`:
+5. **Check and update tool tests** if they exist in `tests/tools/`:
 
 ```bash
-ls tests/unit/test_<tool-name>_tool.py
+ls tests/tools/test_<tool-name>_tool.py
 ```
 
 6. **Verify fix** by re-running both integration and unit tests
@@ -48,7 +48,7 @@ ls tests/unit/test_<tool-name>_tool.py
 | Missing data wrapper | `src/tooluniverse/*_tool.py` (operation methods) |
 | Endpoint URL | `src/tooluniverse/data/*_tools.json` (endpoint field) |
 | Invalid test example | `src/tooluniverse/data/*_tools.json` (test_examples) |
-| Unit test updates | `tests/unit/test_*_tool.py` (if exists) |
+| Tool test updates | `tests/tools/test_*_tool.py` (if exists) |
 | API key as parameter | `src/tooluniverse/data/*_tools.json` (remove param) + `*_tool.py` (use env var) |
 | Tool not loading (optional key) | `src/tooluniverse/data/*_tools.json` (use `optional_api_keys` not `required_api_keys`) |
 
@@ -184,7 +184,7 @@ When test examples fail with 400/404, discover valid IDs by:
 After fixing a tool, check if unit tests exist:
 
 ```bash
-ls tests/unit/test_<tool-name>_tool.py
+ls tests/tools/test_<tool-name>_tool.py
 ```
 
 ### When to Update Unit Tests
@@ -202,15 +202,15 @@ Update unit tests when you:
 
 ```bash
 # Run specific tool tests
-pytest tests/unit/test_<tool-name>_tool.py -v
+pytest tests/tools/test_<tool-name>_tool.py -v
 
 # Run all unit tests
-pytest tests/unit/ -v
+pytest tests/tools/ -v
 ```
 
 ### Unit Test Checklist
 
-- [ ] Check if `tests/unit/test_<tool-name>_tool.py` exists
+- [ ] Check if `tests/tools/test_<tool-name>_tool.py` exists
 - [ ] Run unit tests before and after fix
 - [ ] Update assertions if data structure changed
 - [ ] Ensure both direct and interface tests pass
@@ -228,7 +228,7 @@ python scripts/test_new_tools.py <pattern> -v
 ### Run Unit Tests (if exist)
 
 ```bash
-pytest tests/unit/test_<tool-name>_tool.py -v
+pytest tests/tools/test_<tool-name>_tool.py -v
 ```
 
 ### Regenerate Tools
@@ -346,10 +346,10 @@ first = items[0] if items else {}  # ✅
 | Task | Command |
 |------|---------|
 | Run integration tests | `python scripts/test_new_tools.py <pattern> -v` |
-| Run unit tests | `pytest tests/unit/test_<tool-name>_tool.py -v` |
-| Check if unit tests exist | `ls tests/unit/test_<tool-name>_tool.py` |
+| Run unit tests | `pytest tests/tools/test_<tool-name>_tool.py -v` |
+| Check if unit tests exist | `ls tests/tools/test_<tool-name>_tool.py` |
 | Regenerate tools | `python -m tooluniverse.generate_tools` |
-| Check status | `git status --short \| grep -E "(data\|tools\|.*_tool.py\|tests/unit)"` |
+| Check status | `git status --short \| grep -E "(data\|tools\|.*_tool.py\|tests/tools)"` |
 
 | Error Type | Fix Location |
 |------------|--------------|
@@ -357,6 +357,6 @@ first = items[0] if items else {}  # ✅
 | Schema mismatch | `src/tooluniverse/data/*_tools.json` return_schema |
 | 404 errors | `src/tooluniverse/data/*_tools.json` test_examples or endpoint |
 | Parameter errors | `src/tooluniverse/data/*_tools.json` parameter schema |
-| Unit test failures | `tests/unit/test_*_tool.py` assertions |
+| Unit test failures | `tests/tools/test_*_tool.py` assertions |
 | Tool skipped (optional key) | `src/tooluniverse/data/*_tools.json` use `optional_api_keys` |
 | API key as parameter | Remove from JSON params, use `os.environ.get()` in Python |

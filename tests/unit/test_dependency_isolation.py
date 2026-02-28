@@ -93,11 +93,14 @@ class TestDependencyIsolation:
         assert "Tool2" in tool_errors
 
     def test_tool_universe_get_tool_health_no_tools(self):
-        """Test get_tool_health when no tools are loaded."""
+        """Test get_tool_health after explicitly clearing all tools."""
         try:
             tu = ToolUniverse()
+            # clear_tools() resets to a clean empty state regardless of
+            # workspace auto-load (Phase 11 behaviour)
+            tu.clear_tools()
             health = tu.get_tool_health()
-            
+
             assert health["total"] == 0
             assert health["available"] == 0
             assert health["unavailable"] == 0
@@ -195,7 +198,7 @@ class TestDependencyIsolation:
             
             # Find a tool that can be successfully initialized
             successful_tool = None
-            for tool_name in tu.all_tool_dict.keys():
+            for tool_name in list(tu.all_tool_dict.keys()):
                 try:
                     result = tu._get_tool_instance(tool_name)
                     if result is not None:

@@ -555,9 +555,10 @@ class ToolFinderKeyword(BaseTool):
 
             # Filter by categories if specified
             if categories:
-                filtered_tools = self.tooluniverse.select_tools(
-                    include_categories=categories
-                )
+                categories_set = set(categories)
+                filtered_tools = [
+                    t for t in all_tools if t.get("category") in categories_set
+                ]
             else:
                 filtered_tools = all_tools
 

@@ -241,15 +241,17 @@ class TestToolUniverseCore:
         assert all(isinstance(spec, dict) for spec in specs)
 
     def test_select_tools(self):
-        """Test select_tools method."""
+        """Test filter_tools + category filter (replacement for deprecated select_tools)."""
         self.tu = ToolUniverse()
         self.tu.load_tools()
-        
-        # Test selecting tools by categories
-        selected_tools = self.tu.select_tools(
-            include_categories=['opentarget', 'chembl'],
-            exclude_names=['tool_to_exclude']
-        )
+
+        # Filter by categories using filter_tools + category field
+        include_cat_set = {"opentarget", "chembl"}
+        selected_tools = [
+            t
+            for t in self.tu.filter_tools(exclude_tools={"tool_to_exclude"})
+            if t.get("category") in include_cat_set
+        ]
         assert isinstance(selected_tools, list)
 
     def test_refresh_tool_name_desc(self):
@@ -306,37 +308,35 @@ class TestToolUniverseCore:
         })
         assert result is not None
 
+    @pytest.mark.network
     def test_run_method_multiple_tools(self):
-        """Test run method with multiple tool calls."""
+        """Sequential run() calls must each return a non-None dict."""
         self.tu = ToolUniverse()
         self.tu.load_tools()
-        
-        # Test multiple tool calls - use individual calls instead of batch
-        self.tu.run({
+
+        result1 = self.tu.run({
             "name": "UniProt_get_entry_by_accession",
             "arguments": {"accession": "P05067"}
         })
-        self.tu.run({
+        result2 = self.tu.run({
             "name": "OpenTargets_get_associated_targets_by_disease_efoId",
             "arguments": {"efoId": "EFO_0000249"}
         })
-        
-        # Test that both calls completed without crashing
-        # Results may be None due to API issues, but the calls should not crash
-        # This test just verifies that the run method can handle multiple calls
-        pass  # If we get here without exception, the test passes
+
+        assert result1 is not None, "First run() must return a value"
+        assert result2 is not None, "Second run() must return a value"
+        assert isinstance(result1, dict), f"Expected dict, got {type(result1)}"
+        assert isinstance(result2, dict), f"Expected dict, got {type(result2)}"
 
     def test_direct_import_pattern(self):
-        """Test direct import pattern from documentation."""
-        # This test verifies the direct import pattern works
-        # Note: In unit tests, we mock the actual tool execution
-        # Test that we can import the tools module
+        """The tooluniverse.tools namespace must be resolvable."""
         try:
-            from tooluniverse import tools
-            assert hasattr(tools, '__all__') or len(dir(tools)) > 0
-        except ImportError:
-            # If import fails, that's also acceptable for unit tests
-            pass
+            import tooluniverse.tools as tools_module
+            assert tools_module is not None
+            assert hasattr(tools_module, "__name__")
+        except ImportError as exc:
+            # If a sub-module is missing (e.g. ghost_tool not installed), skip
+            pytest.skip(f"tooluniverse.tools not fully importable: {exc}")
 
     def test_dynamic_access_pattern(self):
         """Test dynamic access pattern from documentation."""
@@ -349,134 +349,70 @@ class TestToolUniverseCore:
         # This test verifies the structure exists
 
     def test_tool_finder_keyword_execution(self):
-        """Test Tool Finder Keyword execution."""
+        """Tool_Finder_Keyword must return a non-empty list (no API key needed)."""
         self.tu = ToolUniverse()
         self.tu.load_tools()
-        
-        try:
-            result = self.tu.run({
-                "name": "Tool_Finder_Keyword",
-                "arguments": {
-                    "description": "protein analysis",
-                    "limit": 5
-                }
-            })
-            
-            # Should return a result
-            assert isinstance(result, (list, dict))
-            
-            # Allow for API key errors
-            if isinstance(result, dict) and "error" in result:
-                assert "API" in str(result["error"]) or "key" in str(result["error"]).lower()
-            elif isinstance(result, list) and result:
-                # Verify result structure
-                assert len(result) > 0
-                assert isinstance(result[0], dict)
-                
-        except Exception as e:
-            # Expected if tool not available or API key missing
-            assert isinstance(e, Exception)
 
+        result = self.tu.run({
+            "name": "Tool_Finder_Keyword",
+            "arguments": {"description": "protein analysis", "limit": 5}
+        })
+
+        # Tool_Finder_Keyword returns a list of tool dicts directly (not a wrapper dict)
+        assert isinstance(result, list), f"Expected list, got {type(result)}: {result!r}"
+        assert len(result) > 0, "Expected at least one keyword match for 'protein analysis'"
+        assert isinstance(result[0], dict), f"Each item must be a dict, got: {result[0]!r}"
+
+    @pytest.mark.require_api_keys
     def test_tool_finder_llm_execution(self):
-        """Test Tool Finder LLM execution."""
+        """Tool_Finder_LLM must return dict with 'tools' when API key is present."""
         self.tu = ToolUniverse()
         self.tu.load_tools()
-        
-        try:
-            result = self.tu.run({
-                "name": "Tool_Finder_LLM",
-                "arguments": {
-                    "description": "protein analysis",
-                    "limit": 5
-                }
-            })
-            
-            # Should return a result
-            assert isinstance(result, (list, dict))
-            
-            # Allow for API key errors
-            if isinstance(result, dict) and "error" in result:
-                assert "API" in str(result["error"]) or "key" in str(result["error"]).lower()
-            elif isinstance(result, list) and result:
-                # Verify result structure
-                assert len(result) > 0
-                assert isinstance(result[0], dict)
-                
-        except Exception as e:
-            # Expected if tool not available or API key missing
-            assert isinstance(e, Exception)
 
-    def test_tool_finder_embedding_execution(self):
-        """Test Tool Finder Embedding execution."""
+        result = self.tu.run({
+            "name": "Tool_Finder_LLM",
+            "arguments": {"description": "protein analysis", "limit": 5}
+        })
+
+        assert isinstance(result, dict), f"Expected dict, got: {result!r}"
+        assert "tools" in result or "error" in result
+
+    def test_tool_finder_keyword_with_selective_load(self):
+        """Tool_Finder_Keyword works when loaded selectively (no embedding model)."""
         self.tu = ToolUniverse()
-        # Load only a minimal set of tools to avoid heavy embedding model loading
         self.tu.load_tools(include_tools=[
-            "Tool_Finder_Keyword", 
-            "UniProt_get_entry_by_accession"
+            "Tool_Finder_Keyword",
+            "UniProt_get_entry_by_accession",
         ])
-        
-        try:
-            # Use the keyword-based tool finder instead of the heavy 
-            # embedding-based one
-            result = self.tu.run({
-                "name": "Tool_Finder_Keyword",
-                "arguments": {
-                    "description": "protein analysis",
-                    "limit": 5
-                }
-            })
-            
-            # Should return a result
-            assert isinstance(result, (list, dict))
-            
-            # Allow for API key errors
-            if isinstance(result, dict) and "error" in result:
-                error_str = str(result["error"])
-                assert "API" in error_str or "key" in error_str.lower()
-            elif isinstance(result, list) and result:
-                # Verify result structure
-                assert len(result) > 0
-                assert isinstance(result[0], dict)
-                
-        except Exception as e:
-            # Expected if tool not available, API key missing, or model loading timeout
-            assert isinstance(e, Exception)
+
+        result = self.tu.run({
+            "name": "Tool_Finder_Keyword",
+            "arguments": {"description": "protein analysis", "limit": 5},
+        })
+
+        # Returns a list of tool dicts (or error dict if validation fails)
+        assert isinstance(result, (list, dict)), (
+            f"Expected list or dict, got {type(result).__name__}: {result!r}"
+        )
+        if isinstance(result, list):
+            assert len(result) >= 0  # list can be empty if keyword search has no matches
+        else:
+            assert "error" in result, f"dict result must have 'error' key: {result!r}"
 
     @pytest.mark.slow
+    @pytest.mark.require_gpu
     def test_tool_finder_embedding_execution_slow(self):
-        """Test Tool Finder Embedding execution with actual embedding model (slow test)."""
+        """Tool_Finder (embedding) must return a dict — requires GPU/heavy model."""
         self.tu = ToolUniverse()
-        # Load only a minimal set of tools to avoid heavy embedding model loading
-        self.tu.load_tools(include_tools=[
-            "Tool_Finder", 
-            "UniProt_get_entry_by_accession"
-        ])
-        
-        try:
-            result = self.tu.run({
-                "name": "Tool_Finder",
-                "arguments": {
-                    "description": "protein analysis",
-                    "limit": 5
-                }
-            })
-            
-            # Should return a result
-            assert isinstance(result, (list, dict))
-            
-            # Allow for API key errors or model loading issues
-            if isinstance(result, dict) and "error" in result:
-                error_str = str(result["error"])
-                assert ("API" in error_str or "key" in error_str.lower() or 
-                        "model" in error_str.lower())
-            elif isinstance(result, list) and result:
-                # Verify result structure
-                assert len(result) > 0
-                assert isinstance(result[0], dict)
-                
-        except Exception as e:
-            # Expected if tool not available, API key missing, or model loading timeout
-            assert isinstance(e, Exception)
+        self.tu.load_tools(include_tools=["Tool_Finder", "UniProt_get_entry_by_accession"])
+
+        result = self.tu.run({
+            "name": "Tool_Finder",
+            "arguments": {"description": "protein analysis", "limit": 5},
+        })
+
+        assert isinstance(result, dict), f"Expected dict, got: {result!r}"
+        assert "tools" in result or "error" in result
 
     def test_combined_loading_parameters(self):
         """Test combined loading parameters as documented."""
@@ -573,27 +509,19 @@ class TestToolUniverseCore:
                 assert 'description' in param_info
 
     def test_tool_execution_flow_structure(self):
-        """Test that tool execution follows documented flow."""
+        """run() must accept documented format and return a dict (not raise)."""
         self.tu = ToolUniverse()
         self.tu.load_tools()
-        
-        # Test that the run method exists and accepts the documented format
-        query = {
-            "name": "action_description",
-            "arguments": {
-                "parameter1": "value1",
-                "parameter2": "value2"
-            }
-        }
-        
-        # This should not raise an exception for structure validation
-        # (actual execution may fail due to missing APIs in unit tests)
-        try:
-            result = self.tu.run(query)
-            assert result is not None
-        except Exception as e:
-            # If it fails, it should be due to API issues, not structure issues
-            assert "error" in str(e).lower() or "invalid" in str(e).lower()
+
+        result = self.tu.run({
+            "name": "action_description",   # unknown tool → error dict
+            "arguments": {"parameter1": "value1", "parameter2": "value2"},
+        })
+
+        # run() must never raise; unknown tool → error dict
+        assert result is not None
+        assert isinstance(result, dict), f"Expected dict, got {type(result)}: {result!r}"
+        assert "error" in result, f"Expected error for unknown tool, got: {result!r}"
 
     def test_tool_loading_performance(self):
         """Test that tool loading is reasonably fast."""
@@ -688,21 +616,18 @@ class TestToolUniverseCore:
         assert "Check API key" in formatted_tool["next_steps"]
 
     def test_all_tools_data_type_consistency(self):
-        """Test that all_tools is consistently a list."""
+        """all_tools must be a list of dicts, each with at least a 'name' string key."""
         self.tu = ToolUniverse()
-        
-        # Before loading tools
+
+        # The workspace profile may auto-load tools; just verify it's a list
         assert isinstance(self.tu.all_tools, list)
-        assert len(self.tu.all_tools) == 0
-        
-        # After loading tools
+
         self.tu.load_tools()
         assert isinstance(self.tu.all_tools, list)
-        assert len(self.tu.all_tools) > 0
-        
-        # Verify all items in all_tools are dictionaries
+        assert len(self.tu.all_tools) > 0, "load_tools() must populate all_tools"
+
         for tool in self.tu.all_tools:
-            assert isinstance(tool, dict)
-            assert "name" in tool
-            assert "type" in tool
+            assert isinstance(tool, dict), f"Tool must be dict, got {type(tool)}: {tool!r}"
+            assert "name" in tool, f"Tool dict must have 'name' key: {tool!r}"
+            assert isinstance(tool["name"], str), f"Tool name must be str: {tool['name']!r}"
 

@@ -1,23 +1,23 @@
-# ToolUniverse Space Configurations
+# ToolUniverse Profile Configurations
 
-This directory contains pre-configured Space configurations for various research domains. Space allows you to easily load, share, and manage tool configurations for ToolUniverse.
+This directory contains pre-configured Profile configurations for various research domains. Profiles allow you to easily load, share, and manage tool configurations for ToolUniverse.
 
 ## Quick Start
 
-All Space configurations can be loaded directly from GitHub:
+All Profile configurations can be loaded directly from GitHub:
 
 ```python
 from tooluniverse import ToolUniverse
 
 tu = ToolUniverse()
 # Load from GitHub raw URL
-config = tu.load_space("https://raw.githubusercontent.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/protein-research.yaml")
+config = tu.load_profile("https://raw.githubusercontent.com/mims-harvard/ToolUniverse/blob/main/examples/spaces/protein-research.yaml")
 
 # Or load from local file
-config = tu.load_space("./examples/spaces/protein-research.yaml")
+config = tu.load_profile("./examples/spaces/protein-research.yaml")
 ```
 
-## Available Space Configurations
+## Available Profile Configurations
 
 ### Drug Discovery & Pharmaceutical Research
 
@@ -150,7 +150,7 @@ config = tu.load_space("./examples/spaces/protein-research.yaml")
 
 ## Usage Examples
 
-### Loading a Space from GitHub
+### Loading a Profile from GitHub
 
 ```python
 from tooluniverse import ToolUniverse
@@ -158,7 +158,7 @@ from tooluniverse import ToolUniverse
 tu = ToolUniverse()
 
 # Load protein research toolkit from GitHub
-config = tu.load_space(
+config = tu.load_profile(
     "https://raw.githubusercontent.com/mims-harvard/ToolUniverse/main/examples/spaces/protein-research.yaml"
 )
 
@@ -166,7 +166,7 @@ config = tu.load_space(
 print(f"Loaded {len(tu.all_tools)} tools from {config.get('name')}")
 ```
 
-### Loading a Space from Local File
+### Loading a Profile from Local File
 
 ```python
 from tooluniverse import ToolUniverse
@@ -174,7 +174,7 @@ from tooluniverse import ToolUniverse
 tu = ToolUniverse()
 
 # Load from local file
-config = tu.load_space("./examples/spaces/protein-research.yaml")
+config = tu.load_profile("./examples/spaces/protein-research.yaml")
 
 # Use the loaded tools
 print(f"Loaded {len(tu.all_tools)} tools")
@@ -190,9 +190,9 @@ tooluniverse-smcp-stdio --load "https://raw.githubusercontent.com/mims-harvard/T
 tooluniverse-smcp-stdio --load "./examples/spaces/protein-research.yaml"
 ```
 
-## Space Selection Guide
+## Profile Selection Guide
 
-Choose a Space based on your research needs:
+Choose a Profile based on your research needs:
 
 - **Drug Discovery**: Use `drug-discovery.yaml` for pharmaceutical research
 - **Protein Research**: Use `protein-research.yaml` for protein structure and function studies
@@ -255,11 +255,11 @@ tools:
 Simple tool collections (like `literature-search.yaml`, `drug-discovery.yaml`) don't need LLM config.
 
 ### Default Mode (Recommended)
-Space LLM config provides defaults for AgenticTools:
+Profile LLM config provides defaults for AgenticTools:
 
 ```yaml
 llm_config:
-  mode: "default"  # Space config as default
+  mode: "default"  # Profile config as default
   # Direct AgenticTool api_type values
   # Supported values: CHATGPT, GEMINI, OPENROUTER, VLLM
   default_provider: "CHATGPT"
@@ -268,7 +268,7 @@ llm_config:
   temperature: 0.3              # 0.0-2.0 range
 ```
 
-**Priority**: Space config > Built-in default
+**Priority**: Profile config > Built-in default
 
 **Use case**: You want to standardize LLM settings across all tools.
 
@@ -279,23 +279,23 @@ export VLLM_SERVER_URL=http://your-vllm-server:8000
 See the `docs/guide/vllm_support.rst` guide for complete vLLM setup instructions.
 
 ### Fallback Mode
-Space LLM config as backup when tool's API fails:
+Profile LLM config as backup when tool's API fails:
 
 ```yaml
 llm_config:
-  mode: "fallback"  # Space config as fallback
+  mode: "fallback"  # Profile config as fallback
   default_provider: "CHATGPT"
   models:
     default: "gpt-4o"           # Used by all AgenticTools
   temperature: 0.3
 ```
 
-**Priority**: Built-in default, then fallback to Space if API unavailable
+**Priority**: Built-in default, then fallback to Profile if API unavailable
 
 **Use case**: Tools have specific LLM preferences, but you want a reliable fallback.
 
 ### Environment Override Mode
-Environment variables have highest priority, overriding both tool configs and Space configs:
+Environment variables have highest priority, overriding both tool configs and Profile configs:
 
 ```yaml
 llm_config:
@@ -306,7 +306,7 @@ llm_config:
   temperature: 0.3
 ```
 
-**Priority**: Environment variables > Tool config > Space config > Built-in default
+**Priority**: Environment variables > Tool config > Profile config > Built-in default
 
 **Use case**: You want to override all LLM settings via environment variables (e.g., for different deployments, testing, or when using vLLM with custom models).
 
@@ -384,10 +384,10 @@ hooks:
 
 ## Contributing
 
-To contribute new Space configurations:
+To contribute new Profile configurations:
 
 1. Create a new YAML file in `examples/spaces/`
-2. Follow the existing Space configuration format
+2. Follow the existing Profile configuration format
 3. Use explicit tool lists (`include_tools`) for clarity
 4. Add a GitHub link comment at the top
 5. Update this README.md file

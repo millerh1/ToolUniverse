@@ -47,20 +47,22 @@ def DoseResponse_compare_potency(
     """
     # Handle mutable defaults to avoid B006 linting error
 
-    return get_shared_client().run_one_function(
-        {
-            "name": "DoseResponse_compare_potency",
-            "arguments": {
-                "operation": operation,
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {k: v for k, v in {
+        "operation": operation,
                 "conc_a": conc_a,
                 "resp_a": resp_a,
                 "conc_b": conc_b,
-                "resp_b": resp_b,
-            },
+                "resp_b": resp_b
+    }.items() if v is not None}
+    return get_shared_client().run_one_function(
+        {
+            "name": "DoseResponse_compare_potency",
+            "arguments": _args,
         },
         stream_callback=stream_callback,
         use_cache=use_cache,
-        validate=validate,
+        validate=validate
     )
 
 

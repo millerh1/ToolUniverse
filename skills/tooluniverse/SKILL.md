@@ -206,6 +206,15 @@ If no specialized skill matches, **EXECUTE** the general strategies (not just de
 |------------------------|---------------------------|
 | "**setup**", "install ToolUniverse", "configure MCP", "API keys", "upgrade", "how to install" | **DO NOW**: `Skill(skill="setup-tooluniverse")` |
 | "**SDK**", "Python SDK", "build AI scientist", "programmatic access", "use ToolUniverse in Python" | **DO NOW**: `Skill(skill="tooluniverse-sdk", args="[use case]")` |
+| "**create skill**", "new skill", "build skill", "add skill", "write a skill" | **DO NOW**: `Skill(skill="create-tooluniverse-skill", args="[skill description]")` |
+| "**create tool**", "new tool", "add tool", "build a tool", "wrap API", "add API", "register tool", "custom tool", "local tool" | **DO NOW**: `Skill(skill="tooluniverse-custom-tool", args="[tool/API description]")` |
+
+> **Access Modes Reminder**: ToolUniverse has three access modes — remind users of the right one for their context:
+> - **MCP server** (`tooluniverse serve` or `tu serve`): For AI assistants (Claude Desktop, Cursor, etc.) — tools appear as native functions
+> - **`tu` CLI** (`tu list`, `tu find`, `tu run`, `tu grep`, `tu info`, `tu test`, `tu build`, `tu status`): For terminal/shell use — discover and run tools from the command line without writing scripts
+> - **Python SDK** (`from tooluniverse import ToolUniverse`): For coding/automation — programmatic access with `tu.tools.ToolName(...)` or `tu.run({...})`
+>
+> If a user seems to be in a terminal context or asks "how do I run a tool from the command line", suggest `tu run ToolName key=val`. If they're in a coding context, suggest the SDK. If they're using an AI assistant, suggest MCP.
 
 ### Routing Workflow (What You Must Do)
 
@@ -260,12 +269,14 @@ If multiple skills could handle the query:
 When you determine no specialized skill covers the user's request:
 
 1. **Acknowledge the gap**: "There isn't a specialized skill for [topic] yet."
-2. **Identify closest skill**: "The closest match is [skill-name], which covers [overlap]."
-3. **Offer general approach**: "I can use ToolUniverse's general strategies to:"
-   - Search for relevant tools using Tool_Finder
-   - Execute multi-hop workflows with discovered tools
-   - Generate a comprehensive report
-4. **Ask user preference**: "Would you like me to: (A) Use general strategies, or (B) Use [closest-skill] and supplement with additional tools?"
+2. **Check for relevant tools**: Run `Tool_Finder` queries — existing tools may already cover it even without a dedicated skill.
+3. **If tools exist** → offer general approach: search + multi-hop workflow + report.
+4. **If no tools exist either** → **recommend building locally**:
+   - **New tool** (wraps a single API/database): `Skill(skill="tooluniverse-custom-tool", args="[API description]")`
+   - **New skill** (orchestrates multiple tools into a workflow): `Skill(skill="create-tooluniverse-skill", args="[skill description]")`
+5. **Ask user preference** with all options on the table.
+
+> **Key principle**: A missing skill or tool is not a dead end — it's an invitation to extend ToolUniverse locally. Always surface the build option to the user.
 
 ### Example Fallback Response
 
@@ -273,10 +284,11 @@ When you determine no specialized skill covers the user's request:
 
 **Your Response**:
 ```
-There isn't a specialized methylation analysis skill yet. However, I can help using two approaches:
+There isn't a specialized methylation analysis skill yet. Here are your options:
 
 (A) Use the **epigenomics** skill for regulatory context, then supplement with methylation-specific tools
-(B) Use general strategies to discover methylation tools (like RnBeads, DSS, methylKit) and build a custom workflow
+(B) Use general strategies to discover methylation tools (RnBeads, DSS, methylKit) and build a custom workflow
+(C) **Build a new `methylation-analysis` skill locally** — I can scaffold it with `create-tooluniverse-skill` so it's reusable for future sessions
 
 Which would you prefer?
 ```
@@ -333,7 +345,15 @@ Which would you prefer?
 
 **Use the strategies below when no specialized skill matches the user's question.**
 
-Master strategies for using ToolUniverse's 10000+ scientific tools effectively. These principles apply regardless of how you access ToolUniverse (MCP server, SDK, or direct tool calls).
+Master strategies for using ToolUniverse's 10000+ scientific tools effectively. These principles apply regardless of how you access ToolUniverse:
+
+| Mode | When to Use | How |
+|------|-------------|-----|
+| **MCP server** | AI assistants (Claude Desktop, Cursor, Windsurf, etc.) | `tu serve` — tools become native functions in the AI |
+| **`tu` CLI** | Terminal/shell — no scripting needed | `tu list`, `tu find "query"`, `tu run ToolName key=val`, `tu grep pattern`, `tu info ToolName`, `tu test ToolName`, `tu build`, `tu status` |
+| **Python SDK** | Scripting, automation, notebooks | `from tooluniverse import ToolUniverse; tu = ToolUniverse(); tu.tools.ToolName(...)` |
+
+> **Tip for users**: If you're unsure which mode to use, check the context — terminal → CLI, Python script → SDK, AI chat → MCP.
 
 ## Core Philosophy (Your Operating Principles)
 
